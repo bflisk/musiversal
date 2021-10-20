@@ -4,7 +4,7 @@
 from flask_login import UserMixin
 # from hashlib import md5
 from app import db
-#from app.auth import spotify_auth, soundcloud_auth, youtube_auth
+from app.auth import spotify, soundcloud, youtube
 from flask import current_app
 
 #--- Association Tables ---#
@@ -77,20 +77,31 @@ class User(UserMixin, db.Model):
     # returns true/false based on success or failure
     def log_in(self, service):
         if service == 'spotify':
-            status = spotify_auth()
+            status = spotify.auth()
         elif service == 'soundcloud':
-            status = soundcloud_auth()
+            status = soundcloud.auth()
         elif service == 'youtube':
-            status = youtube_auth()
+            status = youtube.auth()
 
-        if status == 1:
+        if status == True:
             self.logged_in = 1
 
-        return bool(status)
+        return status
 
-    # Creates a unique default avatar for the user using their email
+    # returns true/false if the user is logged into a service
+    def logged_in(self, service):
+        if service == 'spotify':
+            status = spotify.get_token()
+        elif service == 'soundcloud':
+            status = soundcloud.auth()
+        elif service == 'youtube':
+            status = youtube.auth()
+
+        return status
+
+    # Creates a unique default avatar for the user using their username
     def avatar(self, size):
-        digest = md5(self.email.lower().encode('utf-8')).hexdigest()
+        digest = md5(self.username.lower().encode('utf-8')).hexdigest()
         return 'https://www.gravatar.com/avatar/{}?d=identicon&s={}'.format(
             digest, size)
 
