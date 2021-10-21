@@ -3,8 +3,8 @@
 #from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import UserMixin
 # from hashlib import md5
-from app import db
-from app.auth import spotify, soundcloud, youtube
+from app import db, login 
+from app.auth_external import spotify, soundcloud, youtube
 from flask import current_app
 
 #--- Association Tables ---#
@@ -244,3 +244,7 @@ class Artist(db.Model):
             return #SOUNDCLOUD LINK
         elif self.service == 'youtube':
             return #YOUTUBE LINK
+
+@login.user_loader
+def load_user(id):
+    return User.query.get(int(id))
