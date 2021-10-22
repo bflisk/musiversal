@@ -3,15 +3,20 @@
 #from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import UserMixin
 # from hashlib import md5
-from app import db, login 
+from datetime import datetime
+from app import db, login
 from app.auth_external import spotify, soundcloud, youtube
 from flask import current_app
+
+# EXAMPLE QUERY FOR FUTURE REFERENCE
+# u.services.filter_by(name='spotify').first().id
+# outputs the spotify service entry for a specific user
 
 #--- Association Tables ---#
 
 # association table connecting playlists and tracks
 # is used to prevent duplication of tracks if one track is used in multiple playlists
-playlist_track = db.Table('tracklist',
+playlist_track = db.Table('playlist_track',
     db.Column('playlist_id', db.Integer, db.ForeignKey('playlist.id')),
     db.Column('track_id', db.Integer, db.ForeignKey('track.id'))
 )
@@ -51,6 +56,8 @@ class User(UserMixin, db.Model):
     email = db.Column(db.String(120), index=True, unique=True)
     password_hash = db.Column(db.String(128))
     services = db.relationship('Service', backref='user', lazy='dynamic')
+    playlists = db.relationship('Playlist', backref='owner', lazy='dynamic')
+    last_seen = db.Column(db.DateTime, default=datetime.utcnow)
 
     def __repr__(self):
         return '<User {}>'.format(self.username)
@@ -67,7 +74,7 @@ class User(UserMixin, db.Model):
     def initialize_services(self, services):
         for service in services:
             # checks if the service is already in the user's list of services
-            if not self.services.query.filter_by(name=service):
+            if not self.services.filter_by(name=service).first():
                 svc = Service(user_id=self.id, name=service)
                 db.session.add(svc)
 
@@ -138,11 +145,15 @@ class Playlist(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     title = db.Column(db.String(30))
     description = db.Column(db.String(140))
-    tracks = db.relationship('Track', secondary=playlist_track, backref='playlist', lazy='dynamic')
+    tracks = db.relationship(
+        'Track',
+        secondary=playlist_track,
+        back_populates='playlists',
+        lazy='dynamic')
 
     def __repr__(self):
-        return '<Playlist {}, User {}>'.format(
-            self.title, User.query.filter_by(id=self.user_id))
+        return '<Playlist {}, ID {}>'.format(
+            self.title, self.id)
 
     # adds a track to the playlist
     def add_track(self, track):
@@ -163,14 +174,23 @@ class Playlist(db.Model):
 class Track(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(128))
-    album = db.relationship(db.String(128), db.ForeignKey('album.title'))
-    artists = db.relationship('Artist', secondary=album_artist, backref='playlist', lazy='dynamic')
+    album = db.relationship('Album', backref='track', lazy='dynamic')
+    artists = db.relationship(
+        'Artist',
+        secondary=track_artist,
+        back_populates='tracks',
+        lazy='dynamic')
     info = db.Column(db.String(2048))
     service = db.Column(db.String(32))
-    playlists = db.relationship('Playlist', secondary=playlist_track, backref='track', lazy='dynamic')
+    playlists = db.relationship(
+        'Playlist',
+        secondary=playlist_track,
+        back_populates='tracks',
+        lazy='dynamic')
 
     def __repr__(self):
-        return '<Track {}>'.format(self.title)
+        return '<Track {}, Service {}>'.format(
+            self.title, self.service)
 
     # returns track artwork
     def art(self):
@@ -194,7 +214,12 @@ class Track(db.Model):
 class Album(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(128))
-    artists = db.relationship('Artist', secondary=album_artist, backref='playlist', lazy='dynamic')
+    track_id = db.Column(db.Integer, db.ForeignKey('track.id'))
+    artists = db.relationship(
+        'Artist',
+        secondary=album_artist,
+        back_populates='albums',
+        lazy='dynamic')
 
     def __repr__(self):
         return '<Album {}>'.format(self.title)
@@ -221,8 +246,16 @@ class Album(db.Model):
 class Artist(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(128))
-    tracks = db.relationship('Track', secondary=track_artist, backref='playlist', lazy='dynamic')
-    albums = db.relationship('Album', secondary=album_artist, backref='playlist', lazy='dynamic')
+    tracks = db.relationship(
+        'Track',
+        secondary=track_artist,
+        back_populates='artists',
+        lazy='dynamic')
+    albums = db.relationship(
+        'Album',
+        secondary=album_artist,
+        back_populates='artists',
+        lazy='dynamic')
 
     def __repr__(self):
         return '<Artist {}>'.format(self.name)
