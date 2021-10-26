@@ -1,11 +1,10 @@
 from flask import render_template, flash, redirect, url_for, request
-from flask_login import current_user, login_user, logout_user
+from flask_login import current_user, login_user, logout_user, login_required
 from app import db
 from app.models import User
-from app.main import bp
+from app.auth_internal import bp
 from app.auth_internal.forms import LoginForm, RegistrationForm
-
-SUPPORTED_SERVICES = ['spotify', 'soundcloud', 'youtube']
+#from config.Config import SUPPORTED_SERVICES
 
 # displays and handles the login page
 @bp.route('/login', methods=['GET', 'POST'])
@@ -18,17 +17,17 @@ def login():
 
     # attempts to retrieve user from database
 	if form.validate_on_submit():
-		user = User.query.filter(username=form.username.data).first()
+		user = User.query.filter_by(username=form.username.data).first()
 
     	# checks the user's username and password
 		if user is None or not user.check_password(form.password.data):
 			flash('Invalid username or password')
-			return redirect(url_for('login'))
+			return redirect(url_for('auth_internal.login'))
 
 		login_user(user, remember=form.remember_me.data)
-		return redirect(url_for('index'))
+		return redirect(url_for('main.index'))
 
-	return render_template('login.html', title='Sign in', form=form)
+	return render_template('auth_internal/login.html', title='Sign in', form=form)
 
 # displays and handles the registration page
 @bp.route('/register', methods=['GET', 'POST'])
@@ -55,3 +54,13 @@ def register():
 		return redirect(url_for('auth_internal.login'))
 
 	return render_template('auth_internal/register.html', title='Register', form=form)
+
+@bp.route('/logout')
+@login_required
+def logout():
+	logout_user()
+	return redirect(url_for('auth_internal.login'))
+
+@bp.route('/reset_password_request', methods=['GET', 'POST'])
+def reset_password_request():
+	return redirect(url_for('auth_internal.login'))

@@ -1,3 +1,5 @@
+{% extends 'bootstrap/base.html' %}
+
 {% block title %}
     {% if title %}
     {{ title }} - Universal
@@ -18,13 +20,13 @@
                 </button>
                 <a class="navbar-brand" href="{{ url_for('main.index') }}">Universal</a>
             </div>
-            <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
-                <ul class="nav navbar-nav">
-                    <li><a href="{{ url_for('auth_external.soundcloud') }}">Soundcloud</a></li>
-                    <li><a href="{{ url_for('auth_external.spotify') }}">Spotify</a></li>
-                    <li><a href="{{ url_for('auth_external.youtube') }}">Youtube</a></li>
-                </ul>
-            </div>
+            <!--div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+              <ul class="nav navbar-nav">
+                  <li><a href="{{ url_for('auth_external.auth', service='soundcloud') }}">Soundcloud</a></li>
+                  <li><a href="{{ url_for('auth_external.auth', service='spotify') }}">Spotify</a></li>
+                  <li><a href="{{ url_for('auth_external.auth', service='youtube') }}">Youtube</a></li>
+              </ul>
+            </div-->
         </div>
     </nav>
 {% endblock navbar %}

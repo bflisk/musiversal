@@ -4,13 +4,15 @@ from config import Config
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_login import LoginManager
+from flask_bootstrap import Bootstrap
 
 # create generic module instances
 db = SQLAlchemy()
 migrate = Migrate()
 login = LoginManager()
-login.login_view = 'auth.login' # Indicates the function that handles logins
+login.login_view = 'auth_internal.login' # Indicates the function that handles logins
 login.login_message = 'Please log in to access this page'
+bootstrap = Bootstrap()
 
 def create_app(config_class=Config):
     #--- App Configuration ---#
@@ -21,6 +23,7 @@ def create_app(config_class=Config):
     db.init_app(app)
     migrate.init_app(app, db)
     login.init_app(app)
+    bootstrap.init_app(app)
 
     #--- Blueprints ---#
     from app.main import bp as main_bp

@@ -21,6 +21,7 @@ def index():
 
 # a universal path for logging into services
 @bp.route('/auth/<service>', methods=['GET', 'POST'])
+@login_required
 def auth(service):
     if request.method == 'POST':
         if current_user.is_authenticated:
