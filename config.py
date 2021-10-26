@@ -2,7 +2,11 @@ import os
 from dotenv import load_dotenv
 
 basedir = os.path.abspath(os.path.dirname(__file__))
-load_dotenv(os.path.join(basedir, '.env'))
+
+if basedir[-1] == '/':
+    load_dotenv(os.path.join(basedir, '.env')) # running on windows
+else:
+    load_dotenv(os.path.join(basedir, '/.env')) # running on mac
 
 class Config(object):
     # gets database uri from .env and fallbacks to app.db
