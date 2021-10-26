@@ -35,6 +35,9 @@ def create_app(config_class=Config):
     from app.auth_external import bp as auth_external_bp
     app.register_blueprint(auth_external_bp)
 
+    from app.errors import bp as errors_bp
+    app.register_blueprint(errors_bp)
+
     from app import models
 
     return app
