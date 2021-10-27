@@ -5,7 +5,7 @@ from flask_login import UserMixin
 # from hashlib import md5
 from datetime import datetime
 from app import db, login
-from app.auth_external import spotify, soundcloud, youtube
+from app.auth_external import services
 from flask import current_app
 
 # EXAMPLE QUERY FOR FUTURE REFERENCE
@@ -85,7 +85,8 @@ class User(UserMixin, db.Model):
     # returns true/false based on success or failure
     def log_in(self, service):
         if service == 'spotify':
-            status = spotify.auth()
+            sp = services.Spotify
+            status = sp.auth()
         elif service == 'soundcloud':
             status = soundcloud.auth()
         elif service == 'youtube':

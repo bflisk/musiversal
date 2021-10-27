@@ -5,7 +5,11 @@ from time import time
 from flask import session
 from spotipy.oauth2 import SpotifyClientCredentials, SpotifyOAuth
 
-class spotify():
+class Soundcloud():
+    def auth(self):
+        return 1
+
+class Spotify():
     SPOTIPY_CLIENT_ID = environ.get('SPOTIPY_CLIENT_ID')
     SPOTIPY_CLIENT_SECRET = environ.get('SPOTIPY_CLIENT_SECRET')
 
@@ -52,3 +56,7 @@ class spotify():
             return False
 
         return sp
+
+class Youtube():
+    def auth(self):
+        return 1
