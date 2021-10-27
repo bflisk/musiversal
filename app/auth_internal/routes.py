@@ -4,7 +4,7 @@ from app import db
 from app.models import User
 from app.auth_internal import bp
 from app.auth_internal.forms import LoginForm, RegistrationForm
-#from config.Config import SUPPORTED_SERVICES
+SUPPORTED_SERVICES = ['soundcloud', 'spotify', 'youtube']
 
 # displays and handles the login page
 @bp.route('/login', methods=['GET', 'POST'])
@@ -44,11 +44,12 @@ def register():
 		# creates a new user object with information from the form
 		user = User(username=form.username.data, email=form.email.data)
 		user.set_password(form.password.data)
-		user.initialize_services(SUPPORTED_SERVICES)
 
 		# updates the database
 		db.session.add(user)
 		db.session.commit()
+
+		user.initialize_services(SUPPORTED_SERVICES)
 
 		flash('Congratulations, you are now a registered user!')
 		return redirect(url_for('auth_internal.login'))

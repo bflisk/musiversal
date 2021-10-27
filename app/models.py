@@ -55,28 +55,29 @@ class User(UserMixin, db.Model):
     username = db.Column(db.String(64), index=True, unique=True)
     email = db.Column(db.String(120), index=True, unique=True)
     password_hash = db.Column(db.String(128))
-    services = db.relationship('Service', backref='user', lazy='dynamic')
+    services = db.relationship('Service', backref='user')
     playlists = db.relationship('Playlist', backref='owner', lazy='dynamic')
     last_seen = db.Column(db.DateTime, default=datetime.utcnow)
 
     def __repr__(self):
         return '<User {}>'.format(self.username)
 
-    # Sets the password hash for the user given a password
+    # sets password hash for user given a password
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
 
-    # Checks a given password against the stored password hash
+    # checks given password against stored password hash
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
 
-    # creates new service fields for the given user
-    def initialize_services(self, services):
-        for service in services:
-            # checks if the service is already in the user's list of services
-            if not self.services.filter_by(name=service).first():
-                svc = Service(user_id=self.id, name=service)
-                db.session.add(svc)
+    # creates new service fields for given user
+    def initialize_services(self, init_services):
+        user_services = [s.name for s in self.services] # list of already initialized services for user
+
+        # loops through init_services and adds new service to user if it doesn't exist
+        for service in init_services:
+            if service not in user_services:
+                db.session.add(Service(name=service, user_id=self.id))
 
         db.session.commit()
 

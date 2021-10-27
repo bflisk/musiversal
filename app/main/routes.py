@@ -17,7 +17,8 @@ def before_request():
 @bp.route('/index', methods=['GET', 'POST'])
 @login_required
 def index():
-    return render_template('index.html')
+    services = current_user.services
+    return render_template('index.html', services=services)
 
 # a universal path for logging into services
 @bp.route('/auth/<service>', methods=['GET', 'POST'])
