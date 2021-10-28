@@ -1,11 +1,9 @@
 {% extends 'base.html' %}
 {% import 'bootstrap/wtf.html' as wtf %}
 
-{% block body %}
-  <h1>Hello World!</h1>
-  <p>{{ services }}</p>
-  <p><a href="{{ url_for('auth_internal.logout') }}">Logout</a></p>
-  <p><a href="{{ url_for('auth_external.auth', service='soundcloud') }}">Authorize with Soundcloud</a></p>
-  <p><a href="{{ url_for('auth_external.auth', service='spotify') }}">Authorize with Spotify</a></p>
-  <p><a href="{{ url_for('auth_external.auth', service='youtube') }}">Authorize with Youtube</a></p>
-{% endblock %}
+{% block app_content %}
+  <h1>Hello {{ current_user.username }}!</h1>
+  {% for service in services %}
+    <ul>{{ current_user.username }} is logged into {{ service.name }}: {{ current_user.logged_in(service.name) }}</ul>
+  {% endfor %}
+{% endblock app_content %}

@@ -5,8 +5,8 @@ from flask_login import UserMixin
 # from hashlib import md5
 from datetime import datetime
 from app import db, login
-from app.auth_external import services
 from flask import current_app
+from app.auth_external.services import Spotify, Soundcloud, Youtube
 
 # EXAMPLE QUERY FOR FUTURE REFERENCE
 # u.services.filter_by(name='spotify').first().id
@@ -81,32 +81,21 @@ class User(UserMixin, db.Model):
 
         db.session.commit()
 
-    # logs into a specified service
-    # returns true/false based on success or failure
-    def log_in(self, service):
-        if service == 'spotify':
-            sp = services.Spotify
-            status = sp.auth()
-        elif service == 'soundcloud':
-            status = soundcloud.auth()
-        elif service == 'youtube':
-            status = youtube.auth()
-
-        if status == True:
-            self.logged_in = 1
-
-        return status
-
     # returns true/false if the user is logged into a service
     def logged_in(self, service):
         if service == 'spotify':
-            status = spotify.get_token()
-        elif service == 'soundcloud':
-            status = soundcloud.auth()
-        elif service == 'youtube':
-            status = youtube.auth()
+            spotify = Spotify()
+            token_info = spotify.get_token()
 
-        return status
+            # an invalid token is not a dict (it's usually an Response object)
+            if type(token_info) != dict:
+                return False
+
+            return True
+        elif service == 'soundcloud':
+            return False
+        elif service == 'youtube':
+            return False
 
     # Creates a unique default avatar for the user using their username
     def avatar(self, size):
@@ -134,12 +123,12 @@ class User(UserMixin, db.Model):
 class Service(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    name = db.Column(db.String(32))
-    logged_in = db.Column(db.Integer, default=0)
+    username = db.Column(db.String(120), default='NULL') # username ON THE SERVICE
+    name = db.Column(db.String(32)) # name of the service
 
     def __repr__(self):
-        return '<Service {}, User {}, Logged in {}>'.format(
-            self.name, User.query.filter_by(id=self.user_id), bool(self.logged_in))
+        return '<Service {}, User {}, Username {}>'.format(
+            self.name, User.query.filter_by(id=self.user_id), self.username)
 
 # stores playlist information for universal playlists, NOT service-specific playlists
 class Playlist(db.Model):

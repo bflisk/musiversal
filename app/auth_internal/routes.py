@@ -1,4 +1,4 @@
-from flask import render_template, flash, redirect, url_for, request
+from flask import render_template, flash, redirect, url_for, request, session
 from flask_login import current_user, login_user, logout_user, login_required
 from app import db
 from app.models import User
@@ -60,6 +60,7 @@ def register():
 @login_required
 def logout():
 	logout_user()
+	session.clear()
 	return redirect(url_for('auth_internal.login'))
 
 @bp.route('/reset_password_request', methods=['GET', 'POST'])

@@ -5,7 +5,7 @@
   Register
 {% endblock %}
 
-{% block body %}
+{% block app_content %}
   <h1>Registration Page</h1>
   <div class="row">
     <div class="col-md-4">
@@ -14,4 +14,4 @@
   </div>
   <br>
   <p><a href="{{ url_for('auth_internal.login') }}">Back to Login Page</a></p>
-{% endblock %}
+{% endblock app_content %}
