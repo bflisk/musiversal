@@ -17,6 +17,9 @@ class Config(object):
     SPOTIPY_CLIENT_ID = os.environ.get('SPOTIPY_CLIENT_ID')
     SPOTIPY_CLIENT_SECRET = os.environ.get('SPOTIPY_CLIENT_SECRET')
 
+    # used in youtube authorization
+    YOUTUBE_API_KEY = os.environ.get('YOUTUBE_API_KEY')
+
     # gets database uri from .env and fallbacks to app.db
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
         'sqlite:///' + os.path.join(basedir, 'app.db')

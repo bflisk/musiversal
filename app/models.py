@@ -84,8 +84,8 @@ class User(UserMixin, db.Model):
     # returns true/false if the user is logged into a service
     def logged_in(self, service):
         if service == 'spotify':
-            spotify = Spotify()
-            token_info = spotify.get_token()
+            sp = Spotify()
+            token_info = sp.get_token()
 
             # an invalid token is not a dict (it's usually an Response object)
             if type(token_info) != dict:

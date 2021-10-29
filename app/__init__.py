@@ -38,6 +38,9 @@ def create_app(config_class=Config):
     from app.errors import bp as errors_bp
     app.register_blueprint(errors_bp)
 
+    from app.misc import bp as misc_bp
+    app.register_blueprint(misc_bp)
+
     from app import models
 
     return app

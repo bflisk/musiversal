@@ -1,14 +1,19 @@
+import os
 from flask import render_template, flash, redirect, url_for, request, session
 from flask_login import current_user, login_user, logout_user, login_required
 from app import db
 from app.models import User
 from app.auth_internal import bp
 from app.auth_internal.forms import LoginForm, RegistrationForm
+from app.misc import misc
+
 SUPPORTED_SERVICES = ['soundcloud', 'spotify', 'youtube']
 
 # displays and handles the login page
 @bp.route('/login', methods=['GET', 'POST'])
 def login():
+	misc.clear_cache()
+
     # if the user has already logged in, route them to the index page
 	if current_user.is_authenticated:
 		return redirect(url_for('main.index'))
@@ -32,6 +37,8 @@ def login():
 # displays and handles the registration page
 @bp.route('/register', methods=['GET', 'POST'])
 def register():
+	misc.clear_cache()
+
 	# checks is the user is already authenticated and routes them to the index page
 	if current_user.is_authenticated:
 		return redirect(url_for('main.index'))
@@ -59,6 +66,8 @@ def register():
 @bp.route('/logout')
 @login_required
 def logout():
+	misc.clear_cache()
+
 	logout_user()
 	session.clear()
 	return redirect(url_for('auth_internal.login'))

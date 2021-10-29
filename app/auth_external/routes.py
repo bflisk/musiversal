@@ -1,7 +1,9 @@
+import os
 from app.auth_external import bp, services
 from flask import redirect, url_for, session, request, flash
 from flask_login import current_user, login_required
 from app import db
+from app.misc import misc
 
 # a universal path for logging into services
 @bp.route('/auth_login/<service>', methods=['GET', 'POST'])
@@ -9,17 +11,20 @@ from app import db
 def auth_login(service):
     # if request.method == 'POST'
     if current_user.is_authenticated:
-        if service == 'spotify':
-            spotify = services.Spotify()
+        misc.clear_cache()
 
-            sp_oauth = spotify.create_oauth() # creates a new sp_oauth
-            auth_url = sp_oauth.get_authorize_url() # passes the authorization url into a variable
+        # authorizes with a specific service
+        if service == 'soundcloud':
+            return f'> {service} auth under construction <'
+        elif service == 'spotify':
+            sp = services.Spotify() # creates a new spotify object
+            auth_url = sp.oauth.get_authorize_url() # used to redirect spotify to auth_redirect
 
             return redirect(auth_url)
-        elif service == 'soundcloud':
-            return f'> {service} auth under construction <'
         elif service == 'youtube':
-            return f'> {service} auth under construction <'
+            yt = services.Youtube() # creates a new youtube object
+
+            return yt.search('blartwave')
     else:
         flash('You are not logged in!')
         return redirect(url_for('auth_internal.login'))
@@ -28,20 +33,20 @@ def auth_login(service):
 @bp.route("/auth_redirect/<service>")
 def auth_redirect(service):
     if service == 'spotify':
-        spotify = services.Spotify()
-        sp_oauth = spotify.create_oauth() # Creates a new sp_oauth object
+        sp = services.Spotify()
 
         code = request.args.get('code') # Gets code from response URL
-        token_info = sp_oauth.get_access_token(code) # Uses code sent from Spotify to exchange for an access & refresh token
+        token_info = sp.oauth.get_access_token(code) # Uses code sent from Spotify to exchange for an access & refresh token
         session['sp_token_info'] = token_info # Saves token info into the the session
 
-        sp = spotify.create_sp()
-        if sp == False:
+        # creates a spotify api object to interface with
+        sp.create_api()
+        if sp.api == None:
             flash('ERROR AE.R.41')
             return redirect(url_for('main.index'))
 
         # saves the user's spotify username into the session
-        session['spotify_username'] = sp.current_user()['display_name']
+        session['spotify_username'] = sp.api.current_user()['display_name']
 
         flash('Logged into Spotify successfully!')
         return redirect(url_for('main.index', _external=True))
