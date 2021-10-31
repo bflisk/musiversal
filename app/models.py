@@ -95,7 +95,12 @@ class User(UserMixin, db.Model):
         elif service == 'soundcloud':
             return False
         elif service == 'youtube':
-            return False
+            """yt = Youtube()
+            token_info = yt.get_token()
+
+            print(token_info)"""
+
+            return True
 
     # Creates a unique default avatar for the user using their username
     def avatar(self, size):
@@ -125,6 +130,7 @@ class Service(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     username = db.Column(db.String(120), default='NULL') # username ON THE SERVICE
     name = db.Column(db.String(32)) # name of the service
+    credentials = db.Column(db.Text()) # other credentials associated with a specific service
 
     def __repr__(self):
         return '<Service {}, User {}, Username {}>'.format(

@@ -1,12 +1,15 @@
 from config import Config
 from time import time
-from flask import session, url_for, redirect
+from flask import session, url_for, redirect, request
 from flask_login import current_user
+#from app.models import Service
 
 import spotipy.util as util
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials, SpotifyOAuth
 
+from google_auth_oauthlib.flow import InstalledAppFlow, Flow
+from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 
 class Soundcloud():
@@ -15,24 +18,20 @@ class Soundcloud():
 
 # handles the authorization and interfacing with the spotify api
 class Spotify():
-    oauth = None # used to authorize with spotify
-    api = None # used to interface with spotify api
 
-    # creates a spotify authorization object
+    # initialized with a spotify authorization object
     def __init__(self):
         self.oauth =  SpotifyOAuth(
-            client_id=Config.SPOTIPY_CLIENT_ID,
-            client_secret=Config.SPOTIPY_CLIENT_SECRET,
+            client_id=Config.SPOTIFY_CLIENT_ID,
+            client_secret=Config.SPOTIFY_CLIENT_SECRET,
             redirect_uri=url_for('auth_external.auth_redirect', _external=True, service='spotify'),
-            scope="""ugc-image-upload user-read-recently-played user-read-playback-state
-            user-top-read app-remote-control playlist-modify-public user-modify-playback-state
-            playlist-modify-private user-follow-modify user-read-currently-playing user-follow-read
-            user-library-modify user-read-playback-position playlist-read-private user-read-email
-            user-read-private user-library-read playlist-read-collaborative streaming""")
+            scope=Config.SPOTIFY_SCOPES)
+
+        self.auth_url = self.oauth.get_authorize_url() # used to redirect spotify to auth_redirect
 
     # returns a valid access token, refreshing it if needed
     def get_token(self):
-        token_info = session.get("sp_token_info", None) # Gives token information if it exists, otherwise given 'None'
+        token_info = session.get('sp_token_info', None) # Gives token information if it exists, otherwise given 'None'
 
         # redirects user to login if token_info is 'None'
         if type(token_info) != dict:
@@ -46,7 +45,7 @@ class Spotify():
         if is_expired:
             token_info = self.oauth.refresh_access_token(token_info['refresh_token'])
 
-        session['token_info'] = token_info
+        session['sp_token_info'] = token_info
 
         return token_info
 
@@ -55,11 +54,9 @@ class Spotify():
         # tries to get token data
         try:
             token_info = self.get_token()
-            sp = spotipy.Spotify(auth=token_info['access_token'])
+            self.api = spotipy.Spotify(auth=token_info['access_token'])
         except:
-            sp = None
-
-        self.api = sp
+            self.api = None
 
     # returns search results
     def search(self, query):
@@ -68,18 +65,60 @@ class Spotify():
 
 # handles the authorization and interfacing with the youtube api
 class Youtube():
-    api = None # used to interface with the youtube api
 
-    # authorizes the user with youtube
+    # creates a youtube authorization object
     def __init__(self):
-        self.api = build('youtube', 'v3', developerKey=Config.YOUTUBE_API_KEY)
+        flow = Flow.from_client_secrets_file(
+            Config.YOUTUBE_CLIENT_SECRETS_FILE,
+            scopes=Config.YOUTUBE_SCOPES)
 
-    def statistics(self, channel_id):
-        # 'UCRF5G3zVPHuuMiPPd84SG7Q'
-        request = self.api.channels().list(part='statistics', id=channel_id)
-        response = request.execute()
+        # sets the redirect url for google to send the user back to
+        flow.redirect_uri = url_for(
+            'auth_external.auth_redirect',
+            _external=True,
+            service='youtube')
 
-        return response
+        # creates the authorization_url to route to
+        self.auth_url, self.state = flow.authorization_url(
+            access_type='offline',
+            include_granted_scopes='true')
+
+        session['state'] = self.state
+
+    # returns a valid youtube access token
+    def get_token(self):
+        flow = Flow.from_client_secrets_file(
+            Config.YOUTUBE_CLIENT_SECRETS_FILE,
+            scopes=[Config.YOUTUBE_SCOPES],
+            state=session['state'])
+
+        flow.redirect_uri = url_for('auth_external.auth_redirect', _external=True, service='youtube')
+
+        # fetches a token from google and stores its credentials
+        print('=======================================')
+        print(request.url)
+        print('=======================================')
+        flow.fetch_token(authorization_response=request.url)
+
+        # stores the relevant token data into the session
+        flask.session['yt_token_info'] = {
+            'token': flow.credentials.token,
+            'refresh_token': flow.credentials.refresh_token,
+            'token_uri': flow.credentials.token_uri,
+            'client_id': flow.credentials.client_id,
+            'client_secret': flow.credentials.client_secret,
+            'scopes': flow.credentials.scopes}
+
+        return token_info
+
+    # creates an interface to interact with youtube
+    def create_api(self):
+        # tries to get token data
+        try:
+            token_info = self.get_token()
+            self.api = build('youtube', Config.YOUTUBE_API_VERSION, credentials=self.credentials)
+        except:
+            self.api = None
 
     # returns search results for a given query
     def search(self, query):

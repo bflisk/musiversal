@@ -1,4 +1,5 @@
 import os
+from config import Config
 from flask import render_template, flash, redirect, url_for, request, session
 from flask_login import current_user, login_user, logout_user, login_required
 from app import db
@@ -6,8 +7,6 @@ from app.models import User
 from app.auth_internal import bp
 from app.auth_internal.forms import LoginForm, RegistrationForm
 from app.misc import misc
-
-SUPPORTED_SERVICES = ['soundcloud', 'spotify', 'youtube']
 
 # displays and handles the login page
 @bp.route('/login', methods=['GET', 'POST'])
@@ -56,7 +55,7 @@ def register():
 		db.session.add(user)
 		db.session.commit()
 
-		user.initialize_services(SUPPORTED_SERVICES)
+		user.initialize_services(Config.SUPPORTED_SERVICES)
 
 		flash('Congratulations, you are now a registered user!')
 		return redirect(url_for('auth_internal.login'))

@@ -11,46 +11,57 @@ from app.misc import misc
 def auth_login(service):
     # if request.method == 'POST'
     if current_user.is_authenticated:
-        misc.clear_cache()
+        misc.clear_cache() # clears cache to prevent old token reuse
 
         # authorizes with a specific service
-        if service == 'soundcloud':
-            return f'> {service} auth under construction <'
-        elif service == 'spotify':
-            sp = services.Spotify() # creates a new spotify object
-            auth_url = sp.oauth.get_authorize_url() # used to redirect spotify to auth_redirect
-
-            return redirect(auth_url)
+        if service == 'spotify':
+            sp_auth = services.Spotify() # creates a new spotify authorization object
+            return redirect(sp_auth.auth_url)
         elif service == 'youtube':
-            yt = services.Youtube() # creates a new youtube object
-
-            return yt.search('blartwave')
+            yt_auth = services.Youtube() # creates a new youtube authorization object
+            return redirect(yt_auth.auth_url)
     else:
-        flash('You are not logged in!')
+        flash('Please log in to access this page')
         return redirect(url_for('auth_internal.login'))
 
 # Redirects user after logging in and adds them to the user database
 @bp.route("/auth_redirect/<service>")
 def auth_redirect(service):
-    if service == 'spotify':
-        sp = services.Spotify()
+    if current_user.is_authenticated:
+        if service == 'spotify':
+            sp = services.Spotify()
 
-        code = request.args.get('code') # Gets code from response URL
-        token_info = sp.oauth.get_access_token(code) # Uses code sent from Spotify to exchange for an access & refresh token
-        session['sp_token_info'] = token_info # Saves token info into the the session
+            code = request.args.get('code') # Gets code from response URL
+            token_info = sp.oauth.get_access_token(code) # Uses code sent from Spotify to exchange for an access & refresh token
+            session['sp_token_info'] = token_info # Saves token info into the the session
 
-        # creates a spotify api object to interface with
-        sp.create_api()
-        if sp.api == None:
-            flash('ERROR AE.R.41')
+            # creates a spotify api object to interface with
+            sp.create_api()
+            if sp.api == None:
+                flash('ERROR AE.R.41')
+                return redirect(url_for('main.index'))
+
+            # saves the user's spotify username into the session
+            session['spotify_username'] = sp.api.current_user()['display_name']
+
+            flash('Logged into Spotify successfully!')
             return redirect(url_for('main.index'))
+        elif service == 'youtube':
+            # if google servers return an error
+            if request.args.get('error'):
+                error = request.args.get('error')
+                flash(f'An error occurred while logging into Youtube: {error}')
+                return redirect(url_for('main.index'))
 
-        # saves the user's spotify username into the session
-        session['spotify_username'] = sp.api.current_user()['display_name']
+            yt = services.Youtube()
+            print('-----------------------------------------------')
+            print(request.args.get('state'), session.get('state'))
+            print(request.args.get('state') == session.get('state'))
+            print('-----------------------------------------------')
+            token_info = yt.get_token()
 
-        flash('Logged into Spotify successfully!')
-        return redirect(url_for('main.index', _external=True))
-    elif service == 'soundcloud':
-        return 'no'
-    elif service == 'youtube':
-        return 'stop that'
+            flash('Logged into Youtube successfully!')
+            return redirect(url_for('main.index'))
+    else:
+        flash('Please log in to access this page')
+        return redirect(url_for('auth_internal.login'))
