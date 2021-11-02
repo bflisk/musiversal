@@ -28,7 +28,11 @@ def login():
 			flash('Invalid username or password')
 			return redirect(url_for('auth_internal.login'))
 
+		# logs user into the current session
 		login_user(user, remember=form.remember_me.data)
+
+		# keeps user's service list up-to-date
+		current_user.refresh_services()
 		return redirect(url_for('main.index'))
 
 	return render_template('auth_internal/login.html', title='Sign in', form=form)
@@ -55,7 +59,8 @@ def register():
 		db.session.add(user)
 		db.session.commit()
 
-		user.initialize_services(Config.SUPPORTED_SERVICES)
+		# intializes the user's supported services
+		user.refresh_services()
 
 		flash('Congratulations, you are now a registered user!')
 		return redirect(url_for('auth_internal.login'))

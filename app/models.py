@@ -6,6 +6,7 @@ from flask_login import UserMixin
 from datetime import datetime
 from app import db, login
 from flask import current_app
+from config import Config
 
 # EXAMPLE QUERY FOR FUTURE REFERENCE
 # u.services.filter_by(name='spotify').first().id
@@ -69,14 +70,19 @@ class User(UserMixin, db.Model):
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
 
-    # creates new service fields for given user
-    def initialize_services(self, init_services):
+    # keeps a user's list of supported services up-to-date
+    def refresh_services(self):
         user_services = [s.name for s in self.services] # list of already initialized services for user
 
-        # loops through init_services and adds new service to user if it doesn't exist
-        for service in init_services:
+        # loops through supported services and adds new service to user if it doesn't exist
+        for service in Config.SUPPORTED_SERVICES:
             if service not in user_services:
-                db.session.add(Service(name=service, user_id=self.id))
+                db.session.add(Service(user_id=self.id, name=service))
+
+        # loops through current user services (if any) and makes sure there are no unsupported services
+        for service in user_services:
+            if service not in Config.SUPPORTED_SERVICES:
+                db.session.delete(Service.query.filter_by(user_id=self.id, name=service).first())
 
         db.session.commit()
 

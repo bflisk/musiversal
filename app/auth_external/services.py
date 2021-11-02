@@ -3,6 +3,7 @@ from time import time
 from flask import session, url_for, redirect, request
 from flask_login import current_user
 from app.models import Service
+from app import db
 
 import spotipy.util as util
 import spotipy
@@ -11,10 +12,6 @@ from spotipy.oauth2 import SpotifyClientCredentials, SpotifyOAuth
 from google_auth_oauthlib.flow import InstalledAppFlow, Flow
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
-
-class Soundcloud():
-    def auth(self):
-        return 1
 
 # handles the authorization and interfacing with the spotify api
 class Spotify():
@@ -34,32 +31,43 @@ class Spotify():
         # queries db for spotify value associated with the current user
         db_sp = Service.query.filter_by(
             user_id=current_user.id,
-            name='spotify').first()
+            name='spotify')
 
         # passes the token info from the database into a variable
-        token_info = db_sp.credentials
+        token_info = db_sp.first().credentials
 
-        # redirects user to login if token_info is 'None'
-        if token_info:
-            return redirect(url_for('main.index', _external=True))
+        # if token does not exist or it's not valid
+        if token_info != None:
+            # token exists: refresh it
+            # checks if token is close to expiring
+            now = int(time())
+            is_expired = (token_info['expires_at'] - now) < 60
 
-        # checks if token is close to expiring
-        now = int(time())
-        is_expired = (token_info['expires_at'] - now) < 60
+            # if the token is close to expiring, refresh it
+            if is_expired:
+                token_info = self.oauth.refresh_access_token(token_info['refresh_token'])
+        else:
+            # returns none if the get_token method was called to generate a new token
+            # but is not on the auth_redirect page
+            try:
+                request.args.get('code')
+            except:
+                return None
 
-        # if the token is close to expiring, refresh it
-        if is_expired:
-            token_info = self.oauth.refresh_access_token(token_info['refresh_token'])
+            # token does not exist: generate a new one
+            code = request.args.get('code') # gets code from response URL
+            token_info = self.oauth.get_access_token(code) # uses code sent from Spotify to exchange for an access & refresh token
 
-        # stores the token_info into the session and database
+        # stores the relevant token data into the session and database
         session['sp_token_info'] = token_info
-        db_sp.credentials = token_info
+        db_sp.update({'credentials': (token_info)})
+        db.session.commit()
 
         return token_info
 
     # creates api object and passes it into itself
     def create_api(self):
-        # tries to get token data
+        # tries to get token data, return none if unable to
         try:
             token_info = self.get_token()
             self.api = spotipy.Spotify(auth=token_info['access_token'])
@@ -97,22 +105,22 @@ class Youtube():
         else:
             session['yt_state'] = self.state # if a new oauth object is being requested
 
-    # returns a valid youtube access token
+    # returns a valid access token, refreshing it if needed
     def get_token(self):
         # queries db for youtube value associated with the current user
         db_yt = Service.query.filter_by(
             user_id=current_user.id,
-            name='youtube').first()
+            name='youtube')
 
         # passes the token info from the database into a variable
-        token_info = db_yt.credentials
+        token_info = db_yt.first().credentials
 
         # if token does not exist or it's not valid
         if not token_info or not token_info.valid:
             if token_info and token_info.expired and token_info.refresh_token:
                 # token exists but is expired: refresh it
                 token_info.refresh(Request())
-            elif request.url:
+            elif 'auth_redirect/youtube?state' in request.url:
                 # token does not exist: generate a new one
                 flow = Flow.from_client_secrets_file(
                         Config.YOUTUBE_CLIENT_SECRETS_FILE,
@@ -126,34 +134,31 @@ class Youtube():
 
                 flow.fetch_token(authorization_response=request.url)
                 token_info = flow.credentials
-                """token_info = {
-                        'token': flow.credentials.token,
-                        'refresh_token': flow.credentials.refresh_token,
-                        'token_uri': flow.credentials.token_uri,
-                        'client_id': flow.credentials.client_id,
-                        'client_secret': flow.credentials.client_secret,
-                        'scopes': flow.credentials.scopes}"""
             else:
-                return False
+                token_info = None
 
         # stores the relevant token data into the session and database
-        session['yt_token_info'] = token_info
-        db_yt.credentials = token_info
+        try:
+            session['yt_token_info'] =  {
+                'token': db_yt.credentials.token,
+                'refresh_token': db_yt.credentials.refresh_token,
+                'token_uri': db_yt.credentials.token_uri,
+                'client_id': db_yt.credentials.client_id,
+                'client_secret': db_yt.credentials.client_secret,
+                'scopes': db_yt.credentials.scopes}
+        except:
+            session['yt_token_info'] = None
+        db_yt.update({'credentials': (token_info)})
+        db.session.commit()
 
         return token_info
-
-    def refresh_token(self):
-        try:
-            token_info = session['yt_token_info']
-        except:
-            print('NO TOKEN INFO FOR THIS SESSION')
 
     # creates an interface to interact with youtube
     def create_api(self):
         # tries to get token data
         try:
             token_info = self.get_token()
-            self.api = build('youtube', Config.YOUTUBE_API_VERSION, credentials=self.credentials)
+            self.api = build('youtube', Config.YOUTUBE_API_VERSION, credentials=token_info)
         except:
             self.api = None
 

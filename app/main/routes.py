@@ -3,6 +3,7 @@ from flask_login import current_user, login_required
 from datetime import datetime
 from app import db
 from app.main import bp
+from app.auth_external.services import Spotify, Youtube
 
 # run before every pageload
 @bp.before_request
@@ -17,8 +18,10 @@ def before_request():
 @bp.route('/index', methods=['GET', 'POST'])
 @login_required
 def index():
+    yt = Youtube()
+    yt.create_api()
     services = current_user.services
-    return render_template('index.html', services=services)
+    return render_template('index.html', services=services, yt=yt)
 
 @bp.route('/redirect_page')
 def redirect_page():

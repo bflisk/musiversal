@@ -4,6 +4,8 @@
 {% block app_content %}
   <h1>Hello {{ current_user.username }}!</h1>
   {% for service in services %}
-    <ul>{{ current_user.username }} is logged into {{ service.name }}: fuck you </ul>
+    <ul>{{ current_user.username }} is logged into {{ service.name }}: {{ service.credentials }}</ul>
   {% endfor %}
+  <br>
+  <p>{{ yt.search('blartwave') }}</p>
 {% endblock app_content %}
