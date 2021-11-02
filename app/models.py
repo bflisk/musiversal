@@ -6,7 +6,6 @@ from flask_login import UserMixin
 from datetime import datetime
 from app import db, login
 from flask import current_app
-from app.auth_external.services import Spotify, Soundcloud, Youtube
 
 # EXAMPLE QUERY FOR FUTURE REFERENCE
 # u.services.filter_by(name='spotify').first().id
@@ -81,27 +80,6 @@ class User(UserMixin, db.Model):
 
         db.session.commit()
 
-    # returns true/false if the user is logged into a service
-    def logged_in(self, service):
-        if service == 'spotify':
-            sp = Spotify()
-            token_info = sp.get_token()
-
-            # an invalid token is not a dict (it's usually an Response object)
-            if type(token_info) != dict:
-                return False
-
-            return True
-        elif service == 'soundcloud':
-            return False
-        elif service == 'youtube':
-            """yt = Youtube()
-            token_info = yt.get_token()
-
-            print(token_info)"""
-
-            return True
-
     # Creates a unique default avatar for the user using their username
     def avatar(self, size):
         digest = md5(self.username.lower().encode('utf-8')).hexdigest()
@@ -130,7 +108,7 @@ class Service(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     username = db.Column(db.String(120), default='NULL') # username ON THE SERVICE
     name = db.Column(db.String(32)) # name of the service
-    credentials = db.Column(db.Text()) # other credentials associated with a specific service
+    credentials = db.Column(db.PickleType()) # other credentials associated with a specific service
 
     def __repr__(self):
         return '<Service {}, User {}, Username {}>'.format(

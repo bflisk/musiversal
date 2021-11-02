@@ -2,7 +2,7 @@ from config import Config
 from time import time
 from flask import session, url_for, redirect, request
 from flask_login import current_user
-#from app.models import Service
+from app.models import Service
 
 import spotipy.util as util
 import spotipy
@@ -31,10 +31,16 @@ class Spotify():
 
     # returns a valid access token, refreshing it if needed
     def get_token(self):
-        token_info = session.get('sp_token_info', None) # Gives token information if it exists, otherwise given 'None'
+        # queries db for spotify value associated with the current user
+        db_sp = Service.query.filter_by(
+            user_id=current_user.id,
+            name='spotify').first()
+
+        # passes the token info from the database into a variable
+        token_info = db_sp.credentials
 
         # redirects user to login if token_info is 'None'
-        if type(token_info) != dict:
+        if token_info:
             return redirect(url_for('main.index', _external=True))
 
         # checks if token is close to expiring
@@ -45,7 +51,9 @@ class Spotify():
         if is_expired:
             token_info = self.oauth.refresh_access_token(token_info['refresh_token'])
 
+        # stores the token_info into the session and database
         session['sp_token_info'] = token_info
+        db_sp.credentials = token_info
 
         return token_info
 
@@ -83,33 +91,62 @@ class Youtube():
             access_type='offline',
             include_granted_scopes='true')
 
-        session['state'] = self.state
+        # makes sure that the correct state is being used
+        if session['yt_state'] != None:
+            self.state = session['yt_state'] # happens after front channel auth has been completed
+        else:
+            session['yt_state'] = self.state # if a new oauth object is being requested
 
     # returns a valid youtube access token
     def get_token(self):
-        flow = Flow.from_client_secrets_file(
-            Config.YOUTUBE_CLIENT_SECRETS_FILE,
-            scopes=[Config.YOUTUBE_SCOPES],
-            state=session['state'])
+        # queries db for youtube value associated with the current user
+        db_yt = Service.query.filter_by(
+            user_id=current_user.id,
+            name='youtube').first()
 
-        flow.redirect_uri = url_for('auth_external.auth_redirect', _external=True, service='youtube')
+        # passes the token info from the database into a variable
+        token_info = db_yt.credentials
 
-        # fetches a token from google and stores its credentials
-        print('=======================================')
-        print(request.url)
-        print('=======================================')
-        flow.fetch_token(authorization_response=request.url)
+        # if token does not exist or it's not valid
+        if not token_info or not token_info.valid:
+            if token_info and token_info.expired and token_info.refresh_token:
+                # token exists but is expired: refresh it
+                token_info.refresh(Request())
+            elif request.url:
+                # token does not exist: generate a new one
+                flow = Flow.from_client_secrets_file(
+                        Config.YOUTUBE_CLIENT_SECRETS_FILE,
+                        scopes=Config.YOUTUBE_SCOPES,
+                        state=self.state)
 
-        # stores the relevant token data into the session
-        flask.session['yt_token_info'] = {
-            'token': flow.credentials.token,
-            'refresh_token': flow.credentials.refresh_token,
-            'token_uri': flow.credentials.token_uri,
-            'client_id': flow.credentials.client_id,
-            'client_secret': flow.credentials.client_secret,
-            'scopes': flow.credentials.scopes}
+                flow.redirect_uri = url_for(
+                        'auth_external.auth_redirect',
+                        _external=True,
+                        service='youtube')
+
+                flow.fetch_token(authorization_response=request.url)
+                token_info = flow.credentials
+                """token_info = {
+                        'token': flow.credentials.token,
+                        'refresh_token': flow.credentials.refresh_token,
+                        'token_uri': flow.credentials.token_uri,
+                        'client_id': flow.credentials.client_id,
+                        'client_secret': flow.credentials.client_secret,
+                        'scopes': flow.credentials.scopes}"""
+            else:
+                return False
+
+        # stores the relevant token data into the session and database
+        session['yt_token_info'] = token_info
+        db_yt.credentials = token_info
 
         return token_info
+
+    def refresh_token(self):
+        try:
+            token_info = session['yt_token_info']
+        except:
+            print('NO TOKEN INFO FOR THIS SESSION')
 
     # creates an interface to interact with youtube
     def create_api(self):
