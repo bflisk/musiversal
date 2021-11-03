@@ -16,8 +16,9 @@
             </div>
             <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
               <ul class="nav navbar-nav">
-                  <li><a href="{{ url_for('auth_external.auth_login', service='spotify') }}">sp_auth</a></li>
-                  <li><a href="{{ url_for('auth_external.auth_login', service='youtube') }}">yt_auth</a></li>
+                  <li><a href="{{ url_for('auth_external.auth_login', service='spotify') }}">Authorize Spotify</a></li>
+                  <li><a href="{{ url_for('auth_external.auth_login', service='youtube') }}">Authorize Youtube</a></li>
+                  <li><a href="{{ url_for('playlists.create_playlist') }}">Create Playlist</a></li>
                   <li><a href="{{ url_for('auth_internal.logout') }}">Logout</a></li>
               </ul>
             </div>

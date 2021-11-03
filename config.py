@@ -29,7 +29,14 @@ class Config(object):
     YOUTUBE_API_KEY = os.environ.get('YOUTUBE_API_KEY')
     YOUTUBE_API_VERSION = 'v3'
     YOUTUBE_CLIENT_SECRETS_FILE = 'yt_client_secrets.json'
-    YOUTUBE_SCOPES = ['https://www.googleapis.com/auth/youtube.readonly']
+    YOUTUBE_SCOPES = [
+        'https://www.googleapis.com/auth/youtube',
+        'https://www.googleapis.com/auth/youtube.channel-memberships.creator',
+        'https://www.googleapis.com/auth/youtube.force-ssl',
+        'https://www.googleapis.com/auth/youtube.readonly',
+        'https://www.googleapis.com/auth/youtube.upload',
+        'https://www.googleapis.com/auth/youtubepartner',
+        'https://www.googleapis.com/auth/youtubepartner-channel-audit']
 
     # gets database uri from .env and fallbacks to app.db
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \

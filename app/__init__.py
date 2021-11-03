@@ -41,6 +41,9 @@ def create_app(config_class=Config):
     from app.misc import bp as misc_bp
     app.register_blueprint(misc_bp)
 
+    from app.playlists import bp as playlists_bp
+    app.register_blueprint(playlists_bp)
+
     from app import models
 
     return app

@@ -18,10 +18,23 @@ def before_request():
 @bp.route('/index', methods=['GET', 'POST'])
 @login_required
 def index():
-    yt = Youtube()
+    """yt = Youtube()
     yt.create_api()
+    yt_results = yt.search('skrillex')
+
+    results = [item for item in yt_results['items']]
+
+    sp = Spotify()
+    sp.create_api()
+    sp_results = sp.search('track', 'skrillex')
+
+    #@results.append(sp_results)
+    results.extend([item for item in sp_results['tracks']['items']])"""
+
+    debug = None
+
     services = current_user.services
-    return render_template('index.html', services=services, yt=yt)
+    return render_template('index.html', services=services, debug=debug)
 
 @bp.route('/redirect_page')
 def redirect_page():

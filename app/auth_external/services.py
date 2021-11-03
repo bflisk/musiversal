@@ -74,9 +74,29 @@ class Spotify():
         except:
             self.api = None
 
-    # returns search results
-    def search(self, query):
-        # SEARCH FOR QUERY HERE #
+    # generic function that returns search results
+    def search(self, type, query):
+        results = self.api.search(q=query, type=type)
+
+        return results
+
+    # returns a list of playlists from spotify associated with the user
+    def get_playlists(self, playlist_id=None):
+        batch_iterator = 0
+        batch = self.api.current_user_playlists(limit=50, offset=0)['items']
+
+        while batch:
+            # Creates a list of user-managed playlists from Spotify
+            for playlist in batch:
+                if playlist['owner']['id'] == session['username']:
+                    results.append(playlist['id'])
+
+            batch_iterator += 1
+            batch.extend(self.api.current_user_playlists(
+                limit=50,
+                offset=batch_iterator*50)['items'])
+
+
         return results
 
 # handles the authorization and interfacing with the youtube api
@@ -100,9 +120,10 @@ class Youtube():
             include_granted_scopes='true')
 
         # makes sure that the correct state is being used
-        if session['yt_state'] != None:
+        try:
+            session['yt_state']
             self.state = session['yt_state'] # happens after front channel auth has been completed
-        else:
+        except:
             session['yt_state'] = self.state # if a new oauth object is being requested
 
     # returns a valid access token, refreshing it if needed
@@ -168,3 +189,20 @@ class Youtube():
         response = request.execute()
 
         return response
+
+    # creates a new playlist on youtube
+    def create_playlist(self, title, description, visibility, default_language):
+        request = self.api.playlists().insert(
+            part='snippet,status',
+            body={
+                'snippet': {
+                    'title': title,
+                    'description': description,
+                },
+                'status': {
+                    'privacyStatus': visibility
+                }
+            })
+
+        response = request.execute()
+        print(response)
