@@ -2,7 +2,6 @@
 #import json
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import UserMixin
-# from hashlib import md5
 from datetime import datetime
 from app import db, login
 from flask import current_app
@@ -126,6 +125,8 @@ class Playlist(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     title = db.Column(db.String(30))
     description = db.Column(db.String(140))
+    art = db.Column(db.String(140))
+    sources = db.relationship('Source', backref='playlist', lazy='dynamic')
     tracks = db.relationship(
         'Track',
         secondary=playlist_track,
@@ -136,38 +137,51 @@ class Playlist(db.Model):
         return '<Playlist {}, ID {}>'.format(
             self.title, self.id)
 
-    # adds a track to the playlist
-    def add_track(self, track):
-        if not self.contains_track(track):
-            self.tracks.append(track)
+    # adds tracks to the playlist from a list of tracks
+    def add_tracks(self, tracks):
+        for track in tracks:
+            if not self.contains_track(track):
+                self.tracks.append(track)
 
-    # removes a track from the playlist
-    def remove_track(self, track):
-        if self.contains_track(track):
-            self.tracks.remove(track)
+    # removes tracks from the playlist from a list of tracks
+    def remove_tracks(self, tracks):
+        for track in tracks:
+            if self.contains_track(track):
+                self.tracks.remove(track)
 
     # returns true/false depending on whether a given track exists in the playlist
     def contains_track(self, track):
         return self.tracks.filter(
             playlist_track.c.track_id == track.id).count() > 0
 
+# stores dynamic sources of a playlist and their options
+class Source(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    playlist_id = db.Column(db.Integer, db.ForeignKey('playlist.id'))
+    service = db.Column(db.String(32))
+    service_id = db.Column(db.String(64))
+
+    def __repr__(self):
+        return '<Source for playlist {}, Service {}, Options {}>'.format(
+            self.playlist_id, self.service, self.options)
+
 # stores information on a track hosted on a specific service
 class Track(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(128))
-    album = db.relationship('Album', backref='track', lazy='dynamic')
+    album = db.relationship('Album', backref='track', lazy='dynamic') # album the track is on
     artists = db.relationship(
         'Artist',
         secondary=track_artist,
         back_populates='tracks',
-        lazy='dynamic')
-    info = db.Column(db.String(2048))
-    service = db.Column(db.String(32))
+        lazy='dynamic') # list of artists that created the track
+    info = db.Column(db.PickleType()) # misc info about the track if applicable
+    service = db.Column(db.String(32)) # name of the service the track is on
     playlists = db.relationship(
         'Playlist',
         secondary=playlist_track,
         back_populates='tracks',
-        lazy='dynamic')
+        lazy='dynamic') # list of playlists the track is on
 
     def __repr__(self):
         return '<Track {}, Service {}>'.format(
@@ -177,8 +191,6 @@ class Track(db.Model):
     def art(self):
         if self.service == 'spotify':
             return #SPOTIFY ART
-        elif self.service == 'soundcloud':
-            return #SOUNDCLOUD ART
         elif self.service == 'youtube':
             return #YOUTUBE ART
 
@@ -186,8 +198,6 @@ class Track(db.Model):
     def link(self):
         if self.service == 'spotify':
             return #SPOTIFY LINK
-        elif self.service == 'soundcloud':
-            return #SOUNDCLOUD LINK
         elif self.service == 'youtube':
             return #YOUTUBE LINK
 
@@ -209,8 +219,6 @@ class Album(db.Model):
     def art(self):
         if self.service == 'spotify':
             return #SPOTIFY ART
-        elif self.service == 'soundcloud':
-            return #SOUNDCLOUD ART
         elif self.service == 'youtube':
             return #YOUTUBE ART
 
@@ -218,8 +226,6 @@ class Album(db.Model):
     def link(self):
         if self.service == 'spotify':
             return #SPOTIFY LINK
-        elif self.service == 'soundcloud':
-            return #SOUNDCLOUD LINK
         elif self.service == 'youtube':
             return #YOUTUBE LINK
 
@@ -245,8 +251,6 @@ class Artist(db.Model):
     def art(self):
         if self.service == 'spotify':
             return #SPOTIFY ART
-        elif self.service == 'soundcloud':
-            return #SOUNDCLOUD ART
         elif self.service == 'youtube':
             return #YOUTUBE ART
 
@@ -254,8 +258,6 @@ class Artist(db.Model):
     def link(self):
         if self.service == 'spotify':
             return #SPOTIFY LINK
-        elif self.service == 'soundcloud':
-            return #SOUNDCLOUD LINK
         elif self.service == 'youtube':
             return #YOUTUBE LINK
 

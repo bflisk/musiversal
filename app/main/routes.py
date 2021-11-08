@@ -4,6 +4,7 @@ from datetime import datetime
 from app import db
 from app.main import bp
 from app.auth_external.services import Spotify, Youtube
+from app.models import Playlist
 
 # run before every pageload
 @bp.before_request
@@ -18,23 +19,11 @@ def before_request():
 @bp.route('/index', methods=['GET', 'POST'])
 @login_required
 def index():
-    """yt = Youtube()
-    yt.create_api()
-    yt_results = yt.search('skrillex')
-
-    results = [item for item in yt_results['items']]
-
-    sp = Spotify()
-    sp.create_api()
-    sp_results = sp.search('track', 'skrillex')
-
-    #@results.append(sp_results)
-    results.extend([item for item in sp_results['tracks']['items']])"""
-
-    debug = None
+    #db.session.commit()
+    playlists = Playlist.query.filter_by(user_id=current_user.id).all()
 
     services = current_user.services
-    return render_template('index.html', services=services, debug=debug)
+    return render_template('index.html', services=services, playlists=playlists)
 
 @bp.route('/redirect_page')
 def redirect_page():

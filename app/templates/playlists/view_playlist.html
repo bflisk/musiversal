@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% import 'bootstrap/wtf.html' as wtf %}
+
+{% block title %}
+  Playlist: {{ playlist.title }}
+{% endblock %}
+
+{% block app_content %}
+  <h1>Playlist "{{ playlist.title }}":</h1>
+  <br>
+  <div class="row">
+    <div class="col-md-4">
+      {{ wtf.quick_form(form) }}
+    </div>
+  </div>
+  <br>
+  {% for source in sources %}
+    <ul>
+      {{ source.service }}: {{ source.service_id }}
+    </ul>
+  {% endfor %}
+  <a href="{{ url_for('playlists.delete_playlist', playlist_id=playlist.id) }}">
+    X
+  </a>
+{% endblock %}

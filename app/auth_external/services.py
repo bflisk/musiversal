@@ -2,7 +2,8 @@ from config import Config
 from time import time
 from flask import session, url_for, redirect, request
 from flask_login import current_user
-from app.models import Service
+from sqlalchemy import delete
+from app.models import Service, Source
 from app import db
 
 import spotipy.util as util
@@ -71,6 +72,7 @@ class Spotify():
         try:
             token_info = self.get_token()
             self.api = spotipy.Spotify(auth=token_info['access_token'])
+            session['sp_username'] = self.api.current_user()
         except:
             self.api = None
 
@@ -88,7 +90,7 @@ class Spotify():
         while batch:
             # Creates a list of user-managed playlists from Spotify
             for playlist in batch:
-                if playlist['owner']['id'] == session['username']:
+                if playlist['owner']['id'] == session['sp_username']:
                     results.append(playlist['id'])
 
             batch_iterator += 1
@@ -98,6 +100,16 @@ class Spotify():
 
 
         return results
+
+    def delete_playlist(self, source):
+        # deletes the spotify playlist associated with the musiversal playlist
+        self.api.user_playlist_unfollow(
+            user=session['sp_username'],
+            playlist_id=source.service_id)
+
+        # deletes the source locally
+        d = delete(Source).where(Source.id == source.id)
+        db.session.execute(d)
 
 # handles the authorization and interfacing with the youtube api
 class Youtube():
@@ -205,4 +217,19 @@ class Youtube():
             })
 
         response = request.execute()
-        print(response)
+
+        return response
+
+    # deletes a playlist by id
+    def delete_playlist(self, source):
+        # deletes the source on google servers
+        request = self.api.playlists().delete(
+            id=source.service_id
+        )
+        response = request.execute()
+
+        # deletes the source locally
+        d = delete(Source).where(Source.id == source.id)
+        db.session.execute(d)
+
+        return response

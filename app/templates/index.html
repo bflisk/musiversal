@@ -7,5 +7,12 @@
     <ul>{{ current_user.username }} is logged into {{ service.name }}: {{ service.credentials }}</ul>
   {% endfor %}
   <br>
-  <p>{{ debug }}</p>
+  {% for playlist in playlists %}
+    <ul>
+      <a href="{{ url_for('playlists.view_playlist', playlist_id=playlist.id) }}">
+        {{ playlist.id }} : {{ playlist.title }}
+      </a>
+    </ul>
+  {% endfor %}
+  <br>
 {% endblock app_content %}
