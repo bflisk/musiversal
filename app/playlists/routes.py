@@ -6,6 +6,7 @@ from app.playlists import bp
 from app.auth_external.services import Spotify, Youtube
 from app.playlists.forms import CreatePlaylistForm, EditPlaylistForm
 from app.models import User, Service, Playlist, Track, Artist, Source
+from urllib.parse import urlparse
 
 # Allows the user to create a new playlist, propagating it to supported services
 @bp.route('/create_playlist', methods=['GET', 'POST'])
@@ -71,33 +72,50 @@ def create_playlist():
     else:
         return render_template('playlists/create_playlist.html', form=form)
 
-@bp.route('/view_playlist/<playlist_id>')
+@bp.route('/view_playlist/<playlist_id>', methods=['GET', 'POST'])
 @login_required
 def view_playlist(playlist_id):
+    """
+    <a href="{{ url_for('playlists.delete_playlist', playlist_id=playlist.id) }}">
+    Delete Playlist
+    </a>
+    """
+
+    form = EditPlaylistForm()
+
     # retrieves the playlist from the database
-    playlist = Playlist.query.filter_by(id=playlist_id, user_id=current_user.id).first()
+    playlist = Playlist.query.filter_by(
+        id=playlist_id,
+        user_id=current_user.id).first()
+    tracks = [] # will store the trackslist of the current playlist
 
     # loops through the db's list of sources and keeps it up-to-date
     # tries to retrieve the playlist from a service, if it doesn't exist remove it from db
+    sp = Spotify()
+    sp.create_api()
+
+    yt = Youtube()
+    yt.create_api()
+
+    # keeps the list of sources updates
     for source in playlist.sources:
         if source.service == 'spotify':
-            sp = Spotify()
-            sp.create_api()
-
             # checks if the user is following the given playlist
             response = sp.api.user_playlist_is_following(
                 playlist_owner_id=session['sp_username'],
                 playlist_id=source.service_id,
                 user_ids=[session['sp_username']['id']])
 
-            # if the user is not following the playlist (the playlist is deleted)
             if response[0] == False:
+                # if the user is not following the playlist (the playlist is deleted)
                 d = delete(Source).where(Source.id == source.id)
                 db.session.execute(d)
+            else:
+                # if the the playlist still exists, retrieve tracklist
+                tracks.extend(sp.get_tracks(source.service_id))
+
         elif source.service == 'youtube':
             # tries to retrieve the playlist from youtube
-            yt = Youtube()
-            yt.create_api()
             request = yt.api.playlists().list(
                 part='id',
                 id=source.service_id)
@@ -107,15 +125,70 @@ def view_playlist(playlist_id):
             if response['pageInfo']['totalResults'] == 0:
                 d = delete(Source).where(Source.id == source.id)
                 db.session.execute(d)
+            else:
+                title = track['snippet']['title']
+                video_id = track['snippet']['resourceId']['videoId']
+                art = track['snippet']['thumbnails']['default']['url']
+                artist = track['snippet']['videoOwnerChannelTitle']
+                artist_id = track['snippet']['videoOwnerChannelId']
 
-    db.session.commit()
+                # tracks.extend(yt.get_tracks(source.service_id))
 
     # retrieves the updates list of sources
     sources = playlist.sources
 
-    form = EditPlaylistForm()
+    db.session.commit()
 
-    return render_template('playlists/view_playlist.html', form=form, playlist=playlist, sources=sources)
+    # updates the playlist with new options
+    if form.validate_on_submit():
+        sources = [form.sources.data]
+        playlist = Playlist.query.filter_by(
+            user_id=current_user.id,
+            id=playlist_id)
+
+        # updates the playlist title
+        if form.title.data:
+            playlist.update({'title': form.title.data})
+
+        # updates the playlist description
+        if form.description.data:
+            playlist.update({'description': form.description.data})
+
+        # if the user is trying to add more sources to the playlist
+        if sources:
+            for source in sources:
+                if 'spotify' in source:
+                    # parses the url for just the playlist id
+                    url = urlparse(source)
+                    service_id = url.path[(url.path.find('t/') + 2):]
+
+                    # adds the source to the database
+                    source = Source(
+                        playlist_id=playlist_id,
+                        service='spotify',
+                        service_id=service_id)
+                    db.session.add(source)
+                elif 'youtube' in source:
+                    # parses the url for just the playlist id
+                    # example url: https://www.youtube.com/playlist?list=PLMkyy7SmsPZB1ykffavxZlmT1xXtHWf8x
+                    url = urlparse(source)
+                    service_id = url.query[(url.query.find('=') + 1):]
+
+                    # adds the source to the database
+                    source = Source(
+                        playlist_id=playlist_id,
+                        service='youtube',
+                        service_id=service_id)
+                    db.session.add(source)
+                else:
+                    flash('Not a valid playlist link')
+
+        db.session.commit()
+
+        return redirect(url_for('playlists.view_playlist', playlist_id=playlist_id))
+
+    return render_template('playlists/view_playlist.html',
+        form=form, playlist=playlist, sources=sources, tracks=tracks)
 
 @bp.route('/delete_playlist/<playlist_id>')
 @login_required

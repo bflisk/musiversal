@@ -154,6 +154,15 @@ class Playlist(db.Model):
         return self.tracks.filter(
             playlist_track.c.track_id == track.id).count() > 0
 
+    # adds a source to the list of playlist sources
+    def add_source(self, service, service_id):
+        source = Source(
+            playlist_id=self.id,
+            service=service,
+            service_id=service_id)
+        db.session.add(source)
+        db.session.commit()
+
 # stores dynamic sources of a playlist and their options
 class Source(db.Model):
     id = db.Column(db.Integer, primary_key=True)

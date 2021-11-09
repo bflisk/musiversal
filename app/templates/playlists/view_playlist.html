@@ -8,18 +8,24 @@
 {% block app_content %}
   <h1>Playlist "{{ playlist.title }}":</h1>
   <br>
+  <p>{{ playlist.description }}</p>
+  <hr>
   <div class="row">
     <div class="col-md-4">
       {{ wtf.quick_form(form) }}
     </div>
   </div>
+  <hr>
   <br>
   {% for source in sources %}
     <ul>
       {{ source.service }}: {{ source.service_id }}
     </ul>
   {% endfor %}
-  <a href="{{ url_for('playlists.delete_playlist', playlist_id=playlist.id) }}">
-    X
-  </a>
+  <hr>
+  <h2>Track List: </h2>
+  <br>
+  {% for track in tracks %}
+    {% include 'playlists/_track.html' %}
+  {% endfor %}
 {% endblock %}

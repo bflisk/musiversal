@@ -14,7 +14,7 @@ class CreatePlaylistForm(FlaskForm):
     submit = SubmitField('Create Playlist')
 
 class EditPlaylistForm(FlaskForm):
-    title = StringField('Title', validators=[DataRequired()])
+    title = StringField('Title')
     description = TextAreaField('Description', validators=[Length(min=0, max=140)])
     sources = StringField('Add Sources')
     submit = SubmitField('Save Changes')

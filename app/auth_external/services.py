@@ -3,7 +3,7 @@ from time import time
 from flask import session, url_for, redirect, request
 from flask_login import current_user
 from sqlalchemy import delete
-from app.models import Service, Source
+from app.models import Service, Source, Track
 from app import db
 
 import spotipy.util as util
@@ -82,27 +82,9 @@ class Spotify():
 
         return results
 
-    # returns a list of playlists from spotify associated with the user
-    def get_playlists(self, playlist_id=None):
-        batch_iterator = 0
-        batch = self.api.current_user_playlists(limit=50, offset=0)['items']
-
-        while batch:
-            # Creates a list of user-managed playlists from Spotify
-            for playlist in batch:
-                if playlist['owner']['id'] == session['sp_username']:
-                    results.append(playlist['id'])
-
-            batch_iterator += 1
-            batch.extend(self.api.current_user_playlists(
-                limit=50,
-                offset=batch_iterator*50)['items'])
-
-
-        return results
-
+    # deletes the spotify playlist associated with the musiversal playlist
     def delete_playlist(self, source):
-        # deletes the spotify playlist associated with the musiversal playlist
+
         self.api.user_playlist_unfollow(
             user=session['sp_username'],
             playlist_id=source.service_id)
@@ -110,6 +92,28 @@ class Spotify():
         # deletes the source locally
         d = delete(Source).where(Source.id == source.id)
         db.session.execute(d)
+
+    # gets a list of tracks from a given playlist
+    def get_tracks(self, playlist_id):
+        tracks = []
+        offset = 0
+
+        batch = self.api.playlist_tracks(
+            playlist_id,
+            limit=100,
+            offset=offset)['items']
+
+        while batch:
+            for track in batch:
+                tracks.append(track)
+
+            offset += 1
+            batch = self.api.playlist_tracks(
+                playlist_id,
+                limit=100,
+                offset=offset*100)['items']
+
+        return tracks
 
 # handles the authorization and interfacing with the youtube api
 class Youtube():
@@ -233,3 +237,34 @@ class Youtube():
         db.session.execute(d)
 
         return response
+
+    # gets a list of tracks from a given playlist
+    def get_tracks(self, playlist_id):
+        tracks = []
+
+        request = self.api.playlistItems().list(
+            part='snippet',
+            maxResults=50,
+            playlistId=playlist_id)
+        batch = request.execute()['items']
+
+        while True:
+            for track in batch:
+                tracks.append(track)
+
+            # breaks out of loop when there is no next page
+            try:
+                batch['nextPageToken']
+            except:
+                break
+
+            request = self.api.playlistItems().list(
+                part='snippet',
+                maxResults=50,
+                pageToken=batch['pageToken'],
+                playlistId=playlist_id)
+            batch = request.execute()['items']
+
+
+        return tracks
+# https://youtube.com/playlist?list=PLVCtLXKko6G0zRGLJwnEg5OAri2HMVtcc
