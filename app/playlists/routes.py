@@ -87,64 +87,16 @@ def view_playlist(playlist_id):
     playlist = Playlist.query.filter_by(
         id=playlist_id,
         user_id=current_user.id).first()
-    tracks = [] # will store the trackslist of the current playlist
 
-    # loops through the db's list of sources and keeps it up-to-date
-    # tries to retrieve the playlist from a service, if it doesn't exist remove it from db
-    sp = Spotify()
-    sp.create_api()
-
-    yt = Youtube()
-    yt.create_api()
-
-    # keeps the list of sources updates
-    for source in playlist.sources:
-        if source.service == 'spotify':
-            # checks if the user is following the given playlist
-            response = sp.api.user_playlist_is_following(
-                playlist_owner_id=session['sp_username'],
-                playlist_id=source.service_id,
-                user_ids=[session['sp_username']['id']])
-
-            if response[0] == False:
-                # if the user is not following the playlist (the playlist is deleted)
-                d = delete(Source).where(Source.id == source.id)
-                db.session.execute(d)
-            else:
-                # if the the playlist still exists, retrieve tracklist
-                tracks.extend(sp.get_tracks(source.service_id))
-
-        elif source.service == 'youtube':
-            # tries to retrieve the playlist from youtube
-            request = yt.api.playlists().list(
-                part='id',
-                id=source.service_id)
-            response = request.execute()
-
-            # if the source doesn't exist, delete the source from db
-            if response['pageInfo']['totalResults'] == 0:
-                d = delete(Source).where(Source.id == source.id)
-                db.session.execute(d)
-            else:
-                title = track['snippet']['title']
-                video_id = track['snippet']['resourceId']['videoId']
-                art = track['snippet']['thumbnails']['default']['url']
-                artist = track['snippet']['videoOwnerChannelTitle']
-                artist_id = track['snippet']['videoOwnerChannelId']
-
-                # tracks.extend(yt.get_tracks(source.service_id))
-
-    # retrieves the updates list of sources
+    # retrieves the updated list of sources
     sources = playlist.sources
-
-    db.session.commit()
 
     # updates the playlist with new options
     if form.validate_on_submit():
-        sources = [form.sources.data]
+        sources = [form.sources.data] # a list of NEW sources the user wants to add
         playlist = Playlist.query.filter_by(
             user_id=current_user.id,
-            id=playlist_id)
+            id=playlist_id) # the current playlist being edited
 
         # updates the playlist title
         if form.title.data:
@@ -162,6 +114,13 @@ def view_playlist(playlist_id):
                     url = urlparse(source)
                     service_id = url.path[(url.path.find('t/') + 2):]
 
+                    try:
+                        # test the playlist link
+                        pass
+                    except:
+                        # playlist link is not valid
+                        pass
+
                     # adds the source to the database
                     source = Source(
                         playlist_id=playlist_id,
@@ -174,6 +133,13 @@ def view_playlist(playlist_id):
                     url = urlparse(source)
                     service_id = url.query[(url.query.find('=') + 1):]
 
+                    try:
+                        # test the playlist link
+                        pass
+                    except:
+                        # playlist link is not valid
+                        pass
+
                     # adds the source to the database
                     source = Source(
                         playlist_id=playlist_id,
@@ -185,10 +151,205 @@ def view_playlist(playlist_id):
 
         db.session.commit()
 
-        return redirect(url_for('playlists.view_playlist', playlist_id=playlist_id))
+        return redirect(url_for('playlists.refresh_playlist', playlist_id=playlist_id))
+
+    # retrieves the playlist's tracks from the db
+    tracks = playlist.tracks.all()
 
     return render_template('playlists/view_playlist.html',
-        form=form, playlist=playlist, sources=sources, tracks=tracks)
+        form=form, playlist=playlist, sources=sources, tracks=tracks, len=len)
+
+@bp.route('/refresh_playlist/<playlist_id>')
+@login_required
+def refresh_playlist(playlist_id):
+    # retrieves the playlist from the database
+    playlist = Playlist.query.filter_by(
+        id=playlist_id,
+        user_id=current_user.id).first()
+
+    sp = Spotify()
+    sp.create_api()
+
+    yt = Youtube()
+    yt.create_api()
+
+    # loops through the db's list of sources and keeps it up-to-date
+    # tries to retrieve the playlist from a service, if it doesn't exist remove it from db
+    for source in playlist.sources:
+        if source.service == 'spotify':
+            # returns whether the user is following the given playlist
+            response = sp.api.user_playlist_is_following(
+                playlist_owner_id=session['sp_username'],
+                playlist_id=source.service_id,
+                user_ids=[session['sp_username']['id']])
+
+            if response[0] == False:
+                # if the user is not following the playlist
+                d = delete(Source).where(Source.id == source.id)
+                db.session.execute(d)
+
+                # TODO
+                # removes the tracks that were on the source from the db
+                to_delete_tracks = playlist.tracks.filter_by(
+
+                )
+            else:
+                # if the user is following the playlist, retrieve tracklist
+                sp_tracks = sp.get_tracks(source.service_id)
+                db_tracks = Track.query.filter_by(
+                    service='spotify',
+                    source_id=source.service_id).all()
+
+                # parses the tracklists for just the titles
+                sp_tracks_titles = [track['track']['name'] for track in sp_tracks]
+                db_tracks_titles = [track.title for track in db_tracks]
+
+                """
+                loops through tracklist of the spotify playlist and
+                checks if each track is in the database or not. It adds a track
+                to the database if it does not yet exist
+                """
+                for track in sp_tracks:
+                    if not track['track']['name'] in db_tracks_titles:
+                        # if the track is not in the list of local playlist tracks
+
+                        # tries to get a link to track art
+                        try:
+                            art = track['track']['album']['images'][2]['url']
+                        except:
+                            art = None
+
+                        # tries to get external link
+                        try:
+                            href = track['track']['external_urls']['spotify']
+                        except:
+                            href = 'https://open.spotify.com'
+
+                        t = Track(
+                            title=track['track']['name'],
+                            service='spotify',
+                            service_id=track['track']['id'],
+                            source_id=source.service_id,
+                            art=art,
+                            href=href
+                        )
+
+                        if not Track.query.filter_by(title=track['track']['name'], service='spotify').first():
+                            # if there is a new track that is not in db, add it
+
+                            # adds artists from track into the database
+                            artists = track['track']['artists']
+                            for artist in artists:
+                                # tries to get the external link to the artist
+                                try:
+                                    href = artist['external_urls']['spotify']
+                                except:
+                                    href = 'https://open.spotify.com'
+
+                                t.add_artist(
+                                    artist['name'],
+                                    artist['id'],
+                                    href
+                                )
+
+                            # tries to get the external link to album
+                            try:
+                                href = track['track']['album']['external_urls']['spotify']
+                            except:
+                                href = 'https://open.spotify.com'
+
+
+                            # links the track to its album
+                            t.add_album(
+                                track['track']['album']['name'],
+                                track['track']['album']['id'],
+                                href
+                            )
+
+                            db.session.add(t)
+
+                        # adds track to this playlist
+                        playlist.add_track(t)
+
+                """
+                loops through tracklist of the musiversal playlist and
+                checks if each track is in the list of spotify tracks.
+                It removes a track from the musiversal playlist if it
+                does not exist in the spotify tracklist.
+                """
+                for track in db_tracks:
+                    if not track.title in sp_tracks_titles:
+                        # if the track is not in the spotify tracklist
+                        playlist.remove_track(track)
+
+
+        elif source.service == 'youtube':
+            # tries to retrieve the playlist from youtube
+            request = yt.api.playlists().list(
+                part='id',
+                id=source.service_id)
+            response = request.execute()
+
+            # if the source doesn't exist, delete the source from db
+            if response['pageInfo']['totalResults'] == 0:
+                d = delete(Source).where(Source.id == source.id)
+                db.session.execute(d)
+            else:
+                # if the playlist still exists, retrieve tracklist
+                yt_tracks = yt.get_tracks(source.service_id)
+                db_tracks = Track.query.filter_by(
+                    service='youtube',
+                    source_id=source.service_id).all()
+
+                # parses the tracklists for just the names
+                yt_tracks_titles = [track['snippet']['title'] for track in yt_tracks]
+                db_tracks_titles = [track.title for track in db_tracks]
+
+                """
+                loops through tracklist of the youtube playlist and
+                checks if each track is in the database or not. It adds a track
+                to the database if it does not yet exist
+                """
+                for track in yt_tracks:
+                    if not track['snippet']['title'] in db_tracks_titles:
+                        # if the track is not in the list of local playlist tracks
+                        t = Track(
+                            title=track['snippet']['title'],
+                            service='youtube',
+                            service_id=track['snippet']['resourceId']['videoId'],
+                            source_id=source.service_id,
+                            art=track['snippet']['thumbnails']['default']['url'],
+                            href='https://www.youtube.com/watch?v=' + track['snippet']['resourceId']['videoId'])
+
+                        if not Track.query.filter_by(title=track['snippet']['title'], service='youtube').first():
+                            # if there is a new track that is not in db, add it
+
+                            # adds artists from track into the database
+                            t.add_artist(
+                                track['snippet']['videoOwnerChannelTitle'],
+                                track['snippet']['videoOwnerChannelId'],
+                                'https://www.youtube.com/channel/' + track['snippet']['videoOwnerChannelId']
+                            )
+
+                            db.session.add(t)
+
+                        # adds track to this playlist
+                        playlist.add_track(t)
+
+                """
+                loops through tracklist of the musiversal playlist and
+                checks if each track is in the list of youtube tracks.
+                It removes a track from the musiversal playlist if it
+                does not exist in the youtube tracklist.
+                """
+                for track in db_tracks:
+                    if not track.title in yt_tracks_titles:
+                        # if the track is not in the spotify tracklist
+                        playlist.remove_track(track)
+
+    db.session.commit()
+
+    return redirect(url_for('playlists.view_playlist', playlist_id=playlist_id))
 
 @bp.route('/delete_playlist/<playlist_id>')
 @login_required

@@ -2,12 +2,23 @@ import os
 from flask import Flask, request, current_app
 from config import Config
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import MetaData
 from flask_migrate import Migrate
 from flask_login import LoginManager
 from flask_bootstrap import Bootstrap
 
+# defines a naming convention to replace unnamed SQLite columns
+naming_convention = {
+    "ix": 'ix_%(column_0_label)s',
+    "uq": "uq_%(table_name)s_%(column_0_name)s",
+    "ck": "ck_%(table_name)s_%(column_0_name)s",
+    "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
+    "pk": "pk_%(table_name)s"
+}
+
 # create generic module instances
-db = SQLAlchemy()
+metadata = MetaData(naming_convention=naming_convention)
+db = SQLAlchemy(metadata=metadata)
 migrate = Migrate()
 login = LoginManager()
 login.login_view = 'auth_internal.login' # Indicates the function that handles logins
@@ -21,7 +32,7 @@ def create_app(config_class=Config):
 
     # register app-specific instances
     db.init_app(app)
-    migrate.init_app(app, db)
+    migrate.init_app(app, db, render_as_batch=True)
     login.init_app(app)
     bootstrap.init_app(app)
 

@@ -137,17 +137,15 @@ class Playlist(db.Model):
         return '<Playlist {}, ID {}>'.format(
             self.title, self.id)
 
-    # adds tracks to the playlist from a list of tracks
-    def add_tracks(self, tracks):
-        for track in tracks:
-            if not self.contains_track(track):
-                self.tracks.append(track)
+    # adds a track to the playlist
+    def add_track(self, track):
+        if not self.contains_track(track):
+            self.tracks.append(track)
 
     # removes tracks from the playlist from a list of tracks
-    def remove_tracks(self, tracks):
-        for track in tracks:
-            if self.contains_track(track):
-                self.tracks.remove(track)
+    def remove_track(self, track):
+        if self.contains_track(track):
+            self.tracks.remove(track)
 
     # returns true/false depending on whether a given track exists in the playlist
     def contains_track(self, track):
@@ -164,11 +162,13 @@ class Playlist(db.Model):
         db.session.commit()
 
 # stores dynamic sources of a playlist and their options
+# a sources is defined as playlist hosted on an external service
 class Source(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    playlist_id = db.Column(db.Integer, db.ForeignKey('playlist.id'))
     service = db.Column(db.String(32))
     service_id = db.Column(db.String(64))
+    playlist_id = db.Column(db.Integer, db.ForeignKey('playlist.id'))
+    tracks = db.relationship('Track', backref='source', lazy='dynamic')
 
     def __repr__(self):
         return '<Source for playlist {}, Service {}, Options {}>'.format(
@@ -177,15 +177,18 @@ class Source(db.Model):
 # stores information on a track hosted on a specific service
 class Track(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    service = db.Column(db.String(32)) # name of the service the track is on
+    service_id = db.Column(db.String(64)) # track id on the corresponding service
+    source_id = db.Column(db.String(64), db.ForeignKey('source.id')) # id of the external playlist this track is on
     title = db.Column(db.String(128))
-    album = db.relationship('Album', backref='track', lazy='dynamic') # album the track is on
+    art = db.Column(db.String(1024)) # track artwork
+    href = db.Column(db.String(1024)) # track external link
+    album_id = db.Column(db.Integer, db.ForeignKey('album.id')) # album the track is on
     artists = db.relationship(
         'Artist',
         secondary=track_artist,
         back_populates='tracks',
         lazy='dynamic') # list of artists that created the track
-    info = db.Column(db.PickleType()) # misc info about the track if applicable
-    service = db.Column(db.String(32)) # name of the service the track is on
     playlists = db.relationship(
         'Playlist',
         secondary=playlist_track,
@@ -196,25 +199,50 @@ class Track(db.Model):
         return '<Track {}, Service {}>'.format(
             self.title, self.service)
 
-    # returns track artwork
-    def art(self):
-        if self.service == 'spotify':
-            return #SPOTIFY ART
-        elif self.service == 'youtube':
-            return #YOUTUBE ART
+    # links a track to its artists
+    def add_artist(self, name, service_id, href=None):
+        if not Artist.query.filter_by(name=name, service_id=service_id).first():
+            # if the artist does not exists in the database, add them
+            a = Artist(
+                name=name,
+                service_id=service_id,
+                service=self.service,
+                href=href)
+            db.session.add(a)
 
-    # returns link to album page
-    def link(self):
-        if self.service == 'spotify':
-            return #SPOTIFY LINK
-        elif self.service == 'youtube':
-            return #YOUTUBE LINK
+        # adds the artist to the track's list of artists
+        self.artists.append(
+            Artist.query.filter_by(
+                name=name,
+                service_id=service_id).first())
+
+        db.session.commit()
+
+    # links the track to its album
+    def add_album(self, title, service_id, href):
+        # queries the db for the album
+        album = Album.query.filter_by(title=title, service_id=service_id).first()
+
+        if not album:
+            # if the album does not exists in the database, add it
+            album = Album(
+                title=title,
+                service_id=service_id,
+                service=self.service)
+            db.session.add(album)
+
+        self.album_id = Album.query.filter_by(title=title, service_id=service_id).first().id
+
+        db.session.commit()
 
 # stores infromation about an album
 class Album(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(128))
-    track_id = db.Column(db.Integer, db.ForeignKey('track.id'))
+    service = db.Column(db.String(32)) # name of the service the track is on
+    service_id = db.Column(db.String(64)) # album id on the corresponding service
+    href = db.Column(db.String(1024)) # album external link
+    tracks = db.relationship('Track', backref='album', lazy='dynamic')
     artists = db.relationship(
         'Artist',
         secondary=album_artist,
@@ -242,6 +270,9 @@ class Album(db.Model):
 class Artist(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(128))
+    service_id = db.Column(db.String(256))
+    service = db.Column(db.String(32))
+    href = db.Column(db.String(1024)) # artist external link
     tracks = db.relationship(
         'Track',
         secondary=track_artist,

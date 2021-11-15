@@ -22,8 +22,11 @@
       {{ source.service }}: {{ source.service_id }}
     </ul>
   {% endfor %}
+  <a href="{{ url_for('playlists.refresh_playlist', playlist_id=playlist.id) }}">
+    Refresh Playlist
+  </a>
   <hr>
-  <h2>Track List: </h2>
+  <h2>Track List ({{ len(tracks) }}): </h2>
   <br>
   {% for track in tracks %}
     {% include 'playlists/_track.html' %}

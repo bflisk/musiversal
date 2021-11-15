@@ -1,21 +1,21 @@
 <table>
   <tr>
     <td width="64px">
-      <img src="{{ track['track']['album']['images'][2]['url'] }}">
+      <img src="{{ track.art }}">
     </td>
 
     <td>
       <span class="track_popup">
-        <a href="{{ track['track']['external_urls']['spotify'] }}">
-          {{ track['track']['name'] }}
+        <a href="{{ track.href }}">
+          {{ track.title }}
         </a> :
-        <a href="{{ track['track']['album']['external_urls']['spotify'] }}">
-          {{ track['track']['album']['name'] }}
+        <a href="{{ track.album }}">
+          {{ track.album.title }}
         </a>
       </span>
       <br>
-      {% for artist in track['track']['artists'] %}
-        <a href="{{ artist['external_urls']['spotify'] }}">{{ artist['name'] }} </a>
+      {% for artist in track.artists %}
+        <a href="{{ artist.href }}">{{ artist.name }} </a>
       {% endfor %}
     </td>
   </tr>
