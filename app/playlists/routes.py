@@ -80,6 +80,11 @@ def view_playlist(playlist_id):
     Delete Playlist
     </a>
     """
+    sp = Spotify()
+    sp.create_api()
+
+    yt = Youtube()
+    yt.create_api()
 
     form = EditPlaylistForm()
 
@@ -109,17 +114,13 @@ def view_playlist(playlist_id):
         # if the user is trying to add more sources to the playlist
         if sources:
             for source in sources:
-                if 'spotify' in source:
-                    # parses the url for just the playlist id
-                    url = urlparse(source)
-                    service_id = url.path[(url.path.find('t/') + 2):]
-
-                    try:
-                        # test the playlist link
-                        pass
-                    except:
-                        # playlist link is not valid
-                        pass
+                if 'spotify' in source or len(source) == 22:
+                    # verifies the source and returns the service id
+                    service_id = sp.verify_source(source)
+                    if len(service_id) != 22:
+                        # spotify id is 22 chars long
+                        flash(service_id)
+                        break
 
                     # adds the source to the database
                     source = Source(
@@ -127,18 +128,14 @@ def view_playlist(playlist_id):
                         service='spotify',
                         service_id=service_id)
                     db.session.add(source)
-                elif 'youtube' in source:
-                    # parses the url for just the playlist id
-                    # example url: https://www.youtube.com/playlist?list=PLMkyy7SmsPZB1ykffavxZlmT1xXtHWf8x
-                    url = urlparse(source)
-                    service_id = url.query[(url.query.find('=') + 1):]
 
-                    try:
-                        # test the playlist link
-                        pass
-                    except:
-                        # playlist link is not valid
-                        pass
+                elif 'youtube' in source or len(source) == 34:
+                    # verifies the source
+                    service_id = yt.verify_source(source)
+                    if len(service_id) != 34:
+                        # youtube id is 34 chars long
+                        flash(service_id)
+                        break
 
                     # adds the source to the database
                     source = Source(
@@ -147,7 +144,7 @@ def view_playlist(playlist_id):
                         service_id=service_id)
                     db.session.add(source)
                 else:
-                    flash('Not a valid playlist link')
+                    flash(f'Not a valid sp or yt playlist link: ({source})')
 
         db.session.commit()
 
@@ -178,10 +175,9 @@ def refresh_playlist(playlist_id):
     for source in playlist.sources:
         if source.service == 'spotify':
             # returns whether the user is following the given playlist
-            response = sp.api.user_playlist_is_following(
-                playlist_owner_id=session['sp_username'],
+            response = sp.api.playlist_is_following(
                 playlist_id=source.service_id,
-                user_ids=[session['sp_username']['id']])
+                user_ids=[sp.api.current_user()['display_name']])
 
             if response[0] == False:
                 # if the user is not following the playlist
@@ -196,7 +192,7 @@ def refresh_playlist(playlist_id):
             else:
                 # if the user is following the playlist, retrieve tracklist
                 sp_tracks = sp.get_tracks(source.service_id)
-                db_tracks = Track.query.filter_by(
+                db_tracks = playlist.tracks.filter_by(
                     service='spotify',
                     source_id=source.service_id).all()
 
@@ -217,7 +213,7 @@ def refresh_playlist(playlist_id):
                         try:
                             art = track['track']['album']['images'][2]['url']
                         except:
-                            art = None
+                            art = ''
 
                         # tries to get external link
                         try:
@@ -225,17 +221,15 @@ def refresh_playlist(playlist_id):
                         except:
                             href = 'https://open.spotify.com'
 
-                        t = Track(
-                            title=track['track']['name'],
-                            service='spotify',
-                            service_id=track['track']['id'],
-                            source_id=source.service_id,
-                            art=art,
-                            href=href
-                        )
-
                         if not Track.query.filter_by(title=track['track']['name'], service='spotify').first():
-                            # if there is a new track that is not in db, add it
+                            # if this is a new track that is not in db, add it
+                            t = Track(
+                                title=track['track']['name'],
+                                service='spotify',
+                                service_id=track['track']['id'],
+                                source_id=source.service_id,
+                                art=art,
+                                href=href)
 
                             # adds artists from track into the database
                             artists = track['track']['artists']
@@ -249,8 +243,7 @@ def refresh_playlist(playlist_id):
                                 t.add_artist(
                                     artist['name'],
                                     artist['id'],
-                                    href
-                                )
+                                    href)
 
                             # tries to get the external link to album
                             try:
@@ -269,7 +262,10 @@ def refresh_playlist(playlist_id):
                             db.session.add(t)
 
                         # adds track to this playlist
-                        playlist.add_track(t)
+                        playlist.add_track(
+                            Track.query.filter_by(
+                                title=track['track']['name'],
+                                service='spotify').first())
 
                 """
                 loops through tracklist of the musiversal playlist and
@@ -297,7 +293,7 @@ def refresh_playlist(playlist_id):
             else:
                 # if the playlist still exists, retrieve tracklist
                 yt_tracks = yt.get_tracks(source.service_id)
-                db_tracks = Track.query.filter_by(
+                db_tracks = playlist.tracks.filter_by(
                     service='youtube',
                     source_id=source.service_id).all()
 
@@ -312,29 +308,50 @@ def refresh_playlist(playlist_id):
                 """
                 for track in yt_tracks:
                     if not track['snippet']['title'] in db_tracks_titles:
-                        # if the track is not in the list of local playlist tracks
-                        t = Track(
-                            title=track['snippet']['title'],
-                            service='youtube',
-                            service_id=track['snippet']['resourceId']['videoId'],
-                            source_id=source.service_id,
-                            art=track['snippet']['thumbnails']['default']['url'],
-                            href='https://www.youtube.com/watch?v=' + track['snippet']['resourceId']['videoId'])
-
                         if not Track.query.filter_by(title=track['snippet']['title'], service='youtube').first():
+                            # tries to get a link to track art
+                            try:
+                                art = track['snippet']['thumbnails']['default']['url']
+                            except:
+                                art = ''
+
+                            # tries to get external link
+                            try:
+                                href = 'https://www.youtube.com/watch?v=' + track['snippet']['resourceId']['videoId']
+                            except:
+                                href = 'https://www.youtube.com'
+
+                            # tries to get the channel that uploaded the video
+                            try:
+                                videoOwnerChannelTitle = track['snippet']['videoOwnerChannelTitle']
+                                videoOwnerChannelId = track['snippet']['videoOwnerChannelId']
+                            except:
+                                videoOwnerChannelTitle = ''
+                                videoOwnerChannelId = ''
+
+
                             # if there is a new track that is not in db, add it
+                            t = Track(
+                                title=track['snippet']['title'],
+                                service='youtube',
+                                service_id=track['snippet']['resourceId']['videoId'],
+                                source_id=source.service_id,
+                                art=art,
+                                href=href)
 
                             # adds artists from track into the database
                             t.add_artist(
-                                track['snippet']['videoOwnerChannelTitle'],
-                                track['snippet']['videoOwnerChannelId'],
-                                'https://www.youtube.com/channel/' + track['snippet']['videoOwnerChannelId']
-                            )
+                                videoOwnerChannelTitle,
+                                videoOwnerChannelId,
+                                'https://www.youtube.com/channel/' + videoOwnerChannelId)
 
                             db.session.add(t)
 
                         # adds track to this playlist
-                        playlist.add_track(t)
+                        playlist.add_track(
+                            Track.query.filter_by(
+                                title=track['snippet']['title'],
+                                service='youtube').first())
 
                 """
                 loops through tracklist of the musiversal playlist and

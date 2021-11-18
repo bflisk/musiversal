@@ -64,8 +64,8 @@ def auth_redirect(service):
 
             # saves the user's spotify username into the session and database
             session['sp_username'] = sp.api.current_user()['display_name']
-            db_sp.update({'username': (session['sp_username'])})
-            db.session.commit()
+            #db_sp.update({'username': (session['sp_username'])})
+            #db.session.commit()
 
             flash('Logged into Spotify Successfully!')
             return redirect(url_for('main.index'))

@@ -177,6 +177,7 @@ class Source(db.Model):
 # stores information on a track hosted on a specific service
 class Track(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    # pos = db.Column(db.Integer) # the position of the track in the playlist
     service = db.Column(db.String(32)) # name of the service the track is on
     service_id = db.Column(db.String(64)) # track id on the corresponding service
     source_id = db.Column(db.String(64), db.ForeignKey('source.id')) # id of the external playlist this track is on

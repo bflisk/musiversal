@@ -5,6 +5,7 @@ from flask_login import current_user
 from sqlalchemy import delete
 from app.models import Service, Source, Track
 from app import db
+from urllib.parse import urlparse
 
 import spotipy.util as util
 import spotipy
@@ -114,6 +115,31 @@ class Spotify():
                 offset=offset*100)['items']
 
         return tracks
+
+    # verifies a playlist id/url
+    def verify_source(self, source):
+        # parses the source
+        if 'https' in source and 'spotify' in source:
+            # parses the url for just the playlist id
+            url = urlparse(source)
+            service_id = url.path[(url.path.find('t/') + 2):]
+        elif len(source) == 22:
+            # user inputted a playlist id
+            service_id = source
+        else:
+            return f'Must input playlist ID or playlist link: ({source})'
+
+        # checks if the source exists/is followed
+        try:
+            # test the playlist link
+            self.api.playlist_is_following(
+                playlist_id=service_id,
+                user_ids=[self.api.current_user()['display_name']])
+        except:
+            # playlist link is not valid
+            return f'You are not following this spotify playlist or the id is incorrect: ({source})'
+
+        return service_id
 
 # handles the authorization and interfacing with the youtube api
 class Youtube():
@@ -246,25 +272,50 @@ class Youtube():
             part='snippet',
             maxResults=50,
             playlistId=playlist_id)
-        batch = request.execute()['items']
+        batch = request.execute()
 
         while True:
-            for track in batch:
+            for track in batch['items']:
                 tracks.append(track)
 
             # breaks out of loop when there is no next page
             try:
-                batch['nextPageToken']
+                page_token = batch['nextPageToken']
             except:
                 break
 
             request = self.api.playlistItems().list(
                 part='snippet',
                 maxResults=50,
-                pageToken=batch['pageToken'],
+                pageToken=page_token,
                 playlistId=playlist_id)
-            batch = request.execute()['items']
-
+            batch = request.execute()
 
         return tracks
+
+    # verifies a playlist id/url
+    # returns false if the source is not valid
+    def verify_source(self, source):
+        # parses through the user's input
+        if 'https' in source and 'youtube' in source:
+            # parses the url for just the playlist id
+            # example url: https://www.youtube.com/playlist?list=PLMkyy7SmsPZB1ykffavxZlmT1xXtHWf8x
+            url = urlparse(source)
+            service_id = url.query[(url.query.find('=') + 1):]
+        elif len(source) == 34:
+            # user inputted a playlist id
+            service_id = source
+        else:
+            return f'Must input playlist ID or playlist link: ({source})'
+
+        # checks if the source exists
+        try:
+            # test the playlist link
+            pass
+        except:
+            # playlist link is not valid
+            return f'You are not following this spotify playlist or the id is incorrect: ({source})'
+
+        return service_id
+
 # https://youtube.com/playlist?list=PLVCtLXKko6G0zRGLJwnEg5OAri2HMVtcc
