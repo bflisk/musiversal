@@ -11,6 +11,7 @@ from app.misc import misc
 # displays and handles the login page
 @bp.route('/login', methods=['GET', 'POST'])
 def login():
+	#logout_user()
 	misc.clear_cache()
 
     # if the user has already logged in, route them to the index page
@@ -74,6 +75,7 @@ def logout():
 
 	logout_user()
 	session.clear()
+	print(current_user.is_authenticated)
 	return redirect(url_for('auth_internal.login'))
 
 @bp.route('/reset_password_request', methods=['GET', 'POST'])

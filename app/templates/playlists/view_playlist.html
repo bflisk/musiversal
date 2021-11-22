@@ -25,6 +25,10 @@
   <a href="{{ url_for('playlists.refresh_playlist', playlist_id=playlist.id) }}">
     Refresh Playlist
   </a>
+  <br>
+  <a href="{{ url_for('playlists.delete_playlist', playlist_id=playlist.id) }}">
+    Delete Playlist
+  </a>
   <hr>
   <h2>Track List ({{ len(tracks) }}): </h2>
   <br>

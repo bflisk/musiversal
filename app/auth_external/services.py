@@ -116,8 +116,8 @@ class Spotify():
 
         return tracks
 
-    # verifies a playlist id/url
-    def verify_source(self, source):
+    # parses through a source to retrieve the service id
+    def get_service_id(self, source):
         # parses the source
         if 'https' in source and 'spotify' in source:
             # parses the url for just the playlist id
@@ -127,9 +127,12 @@ class Spotify():
             # user inputted a playlist id
             service_id = source
         else:
-            return f'Must input playlist ID or playlist link: ({source})'
+            return None
 
-        # checks if the source exists/is followed
+        return service_id
+
+    # verifies a playlist id
+    def verify_service_id(self, service_id):
         try:
             # test the playlist link
             self.api.playlist_is_following(
@@ -137,9 +140,9 @@ class Spotify():
                 user_ids=[self.api.current_user()['display_name']])
         except:
             # playlist link is not valid
-            return f'You are not following this spotify playlist or the id is incorrect: ({source})'
+            return None
 
-        return service_id
+        return True
 
 # handles the authorization and interfacing with the youtube api
 class Youtube():
@@ -293,9 +296,8 @@ class Youtube():
 
         return tracks
 
-    # verifies a playlist id/url
-    # returns false if the source is not valid
-    def verify_source(self, source):
+    # parses through a source to retrieve the service id
+    def get_service_id(self, source):
         # parses through the user's input
         if 'https' in source and 'youtube' in source:
             # parses the url for just the playlist id
@@ -306,16 +308,21 @@ class Youtube():
             # user inputted a playlist id
             service_id = source
         else:
-            return f'Must input playlist ID or playlist link: ({source})'
+            return None
 
+        return service_id
+
+    # verifies a playlist id/url
+    # returns false if the source is not valid
+    def verify_service_id(self, service_id):
         # checks if the source exists
         try:
             # test the playlist link
             pass
         except:
             # playlist link is not valid
-            return f'You are not following this spotify playlist or the id is incorrect: ({source})'
+            return None
 
-        return service_id
+        return True
 
 # https://youtube.com/playlist?list=PLVCtLXKko6G0zRGLJwnEg5OAri2HMVtcc

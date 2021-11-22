@@ -6,6 +6,7 @@ from datetime import datetime
 from app import db, login
 from flask import current_app
 from config import Config
+from sqlalchemy import delete
 
 # EXAMPLE QUERY FOR FUTURE REFERENCE
 # u.services.filter_by(name='spotify').first().id
@@ -142,15 +143,15 @@ class Playlist(db.Model):
         if not self.contains_track(track):
             self.tracks.append(track)
 
-    # removes tracks from the playlist from a list of tracks
+    # removes a track from the playlist
     def remove_track(self, track):
         if self.contains_track(track):
             self.tracks.remove(track)
 
     # returns true/false depending on whether a given track exists in the playlist
     def contains_track(self, track):
-        return self.tracks.filter(
-            playlist_track.c.track_id == track.id).count() > 0
+        return self.tracks.filter_by(
+            service_id=track.service_id).first()
 
     # adds a source to the list of playlist sources
     def add_source(self, service, service_id):
@@ -160,6 +161,19 @@ class Playlist(db.Model):
             service_id=service_id)
         db.session.add(source)
         db.session.commit()
+
+    # removes a source from the playlist
+    def remove_source(self, source):
+        if self.contains_source(source):
+            # deletes the source from the database
+            d = delete(Source).where(Source.id == source.id)
+            db.session.execute(d)
+            db.session.commit()
+
+    # returns true/false depending on whether a given source exists in the playlist
+    def contains_source(self, source):
+        return self.sources.filter_by(
+            service_id=source.service_id)
 
 # stores dynamic sources of a playlist and their options
 # a sources is defined as playlist hosted on an external service

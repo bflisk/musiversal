@@ -75,11 +75,6 @@ def create_playlist():
 @bp.route('/view_playlist/<playlist_id>', methods=['GET', 'POST'])
 @login_required
 def view_playlist(playlist_id):
-    """
-    <a href="{{ url_for('playlists.delete_playlist', playlist_id=playlist.id) }}">
-    Delete Playlist
-    </a>
-    """
     sp = Spotify()
     sp.create_api()
 
@@ -116,10 +111,14 @@ def view_playlist(playlist_id):
             for source in sources:
                 if 'spotify' in source or len(source) == 22:
                     # verifies the source and returns the service id
-                    service_id = sp.verify_source(source)
-                    if len(service_id) != 22:
-                        # spotify id is 22 chars long
-                        flash(service_id)
+                    service_id = sp.get_service_id(source)
+                    if not service_id:
+                        flash(f'Must input playlist ID or playlist link: ({source})')
+                        break
+
+                    # checks that the service id refers to a valid spotify playlist
+                    if not sp.verify_service_id(service_id):
+                        flash(f'You are not following this spotify playlist or the id is incorrect: ({source})')
                         break
 
                     # adds the source to the database
@@ -131,10 +130,14 @@ def view_playlist(playlist_id):
 
                 elif 'youtube' in source or len(source) == 34:
                     # verifies the source
-                    service_id = yt.verify_source(source)
-                    if len(service_id) != 34:
-                        # youtube id is 34 chars long
-                        flash(service_id)
+                    service_id = yt.get_service_id(source)
+                    if not service_id:
+                        flash(f'Must input playlist ID or playlist link: ({source})')
+                        break
+
+                    # checks that the service id refers to a valid youtube playlist
+                    if not yt.verify_service_id(service_id):
+                        flash(f'You are not following this spotify playlist or the id is incorrect: ({source})')
                         break
 
                     # adds the source to the database
@@ -180,21 +183,35 @@ def refresh_playlist(playlist_id):
                 user_ids=[sp.api.current_user()['display_name']])
 
             if response[0] == False:
+                # removes the tracks that were on the source from the db
+                to_delete_tracks = playlist.tracks.filter_by(
+                    source_id=source.id
+                )
+
+                for track in to_delete_tracks:
+                    playlist.remove_track(track)
+
                 # if the user is not following the playlist
                 d = delete(Source).where(Source.id == source.id)
                 db.session.execute(d)
-
-                # TODO
-                # removes the tracks that were on the source from the db
-                to_delete_tracks = playlist.tracks.filter_by(
-
-                )
             else:
+                # if the service id is no longer valid, remove the source and it's associated tracks
+                if not sp.verify_service_id(source.service_id):
+                    # queries for tracks attached to the source to be removed
+                    # and removes the tracks
+                    source_tracks = Track.query.filter_by(
+                        source_id=source.id)
+                    for track in source_tracks:
+                        playlist.remove_track(track)
+
+                    # removes the source from the playlist
+                    playlist.remove_source(source)
+
                 # if the user is following the playlist, retrieve tracklist
                 sp_tracks = sp.get_tracks(source.service_id)
                 db_tracks = playlist.tracks.filter_by(
                     service='spotify',
-                    source_id=source.service_id).all()
+                    source_id=source.id).all()
 
                 # parses the tracklists for just the titles
                 sp_tracks_titles = [track['track']['name'] for track in sp_tracks]
@@ -221,13 +238,13 @@ def refresh_playlist(playlist_id):
                         except:
                             href = 'https://open.spotify.com'
 
-                        if not Track.query.filter_by(title=track['track']['name'], service='spotify').first():
-                            # if this is a new track that is not in db, add it
+                        # if this is a new track that is not in db, create and add it
+                        if not Track.query.filter_by(title=track['track']['name'], source_id=source.id).first():
                             t = Track(
                                 title=track['track']['name'],
                                 service='spotify',
                                 service_id=track['track']['id'],
-                                source_id=source.service_id,
+                                source_id=source.id,
                                 art=art,
                                 href=href)
 
@@ -251,7 +268,6 @@ def refresh_playlist(playlist_id):
                             except:
                                 href = 'https://open.spotify.com'
 
-
                             # links the track to its album
                             t.add_album(
                                 track['track']['album']['name'],
@@ -265,7 +281,8 @@ def refresh_playlist(playlist_id):
                         playlist.add_track(
                             Track.query.filter_by(
                                 title=track['track']['name'],
-                                service='spotify').first())
+                                service='spotify',
+                                source_id=source.id).first())
 
                 """
                 loops through tracklist of the musiversal playlist and
@@ -295,7 +312,7 @@ def refresh_playlist(playlist_id):
                 yt_tracks = yt.get_tracks(source.service_id)
                 db_tracks = playlist.tracks.filter_by(
                     service='youtube',
-                    source_id=source.service_id).all()
+                    source_id=source.id).all()
 
                 # parses the tracklists for just the names
                 yt_tracks_titles = [track['snippet']['title'] for track in yt_tracks]
@@ -308,7 +325,7 @@ def refresh_playlist(playlist_id):
                 """
                 for track in yt_tracks:
                     if not track['snippet']['title'] in db_tracks_titles:
-                        if not Track.query.filter_by(title=track['snippet']['title'], service='youtube').first():
+                        if not Track.query.filter_by(title=track['snippet']['title'], source_id=source.id).first():
                             # tries to get a link to track art
                             try:
                                 art = track['snippet']['thumbnails']['default']['url']
@@ -335,7 +352,7 @@ def refresh_playlist(playlist_id):
                                 title=track['snippet']['title'],
                                 service='youtube',
                                 service_id=track['snippet']['resourceId']['videoId'],
-                                source_id=source.service_id,
+                                source_id=source.id,
                                 art=art,
                                 href=href)
 
@@ -371,27 +388,18 @@ def refresh_playlist(playlist_id):
 @bp.route('/delete_playlist/<playlist_id>')
 @login_required
 def delete_playlist(playlist_id):
-    sp = Spotify()
-    sp.create_api()
-
-    yt = Youtube()
-    yt.create_api()
-
     # gets playlist id and its corresponding list of sources
     playlist = Playlist.query.filter_by(id=playlist_id, user_id=current_user.id).first()
-    sources = playlist.sources
 
     # loops through linked sources and deletes them
+    sources = playlist.sources
     for source in sources:
-        if source.service == 'spotify':
-            sp.delete_playlist(source)
-        elif source.service == 'youtube':
-            yt.delete_playlist(source)
+        playlist.remove_source(source)
 
     # deletes the playlist locally
     d = delete(Playlist).where(Playlist.id == playlist.id)
     db.session.execute(d)
     db.session.commit()
 
-    flash(f'Deleted playlist: {playlist.id}')
+    flash(f'Deleted playlist: "{playlist.title}"')
     return redirect(url_for('main.index'))
