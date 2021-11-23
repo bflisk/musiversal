@@ -18,7 +18,14 @@ from sqlalchemy import delete
 # is used to prevent duplication of tracks if one track is used in multiple playlists
 playlist_track = db.Table('playlist_track',
     db.Column('playlist_id', db.Integer, db.ForeignKey('playlist.id')),
-    db.Column('track_id', db.Integer, db.ForeignKey('track.id'))
+    db.Column('track_id', db.Integer, db.ForeignKey('track.id')),
+    db.Column('track_pos', db.Integer)
+)
+
+# association table connecting playlists and sources
+playlist_source = db.Table('playlist_source',
+    db.Column('playlist_id', db.Integer, db.ForeignKey('playlist.id')),
+    db.Column('source_id', db.Integer, db.ForeignKey('source.id'))
 )
 
 # association table connecting albums and artists
@@ -127,7 +134,11 @@ class Playlist(db.Model):
     title = db.Column(db.String(30))
     description = db.Column(db.String(140))
     art = db.Column(db.String(140))
-    sources = db.relationship('Source', backref='playlist', lazy='dynamic')
+    sources = db.relationship(
+        'Source',
+        secondary=playlist_source,
+        back_populates='playlists',
+        lazy='dynamic')
     tracks = db.relationship(
         'Track',
         secondary=playlist_track,
@@ -154,26 +165,20 @@ class Playlist(db.Model):
             service_id=track.service_id).first()
 
     # adds a source to the list of playlist sources
-    def add_source(self, service, service_id):
-        source = Source(
-            playlist_id=self.id,
-            service=service,
-            service_id=service_id)
-        db.session.add(source)
-        db.session.commit()
+    def add_source(self, source):
+        if not self.contains_source(source):
+            self.sources.append(source)
 
     # removes a source from the playlist
     def remove_source(self, source):
         if self.contains_source(source):
-            # deletes the source from the database
-            d = delete(Source).where(Source.id == source.id)
-            db.session.execute(d)
-            db.session.commit()
+            if self.contains_source(source):
+                self.sources.remove(source)
 
     # returns true/false depending on whether a given source exists in the playlist
     def contains_source(self, source):
         return self.sources.filter_by(
-            service_id=source.service_id)
+            service_id=source.service_id).first()
 
 # stores dynamic sources of a playlist and their options
 # a sources is defined as playlist hosted on an external service
@@ -181,7 +186,11 @@ class Source(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     service = db.Column(db.String(32))
     service_id = db.Column(db.String(64))
-    playlist_id = db.Column(db.Integer, db.ForeignKey('playlist.id'))
+    playlists = db.relationship(
+        'Playlist',
+        secondary=playlist_source,
+        back_populates='sources',
+        lazy='dynamic')
     tracks = db.relationship('Track', backref='source', lazy='dynamic')
 
     def __repr__(self):

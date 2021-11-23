@@ -17,6 +17,9 @@
       {% for artist in track.artists %}
         <a href="{{ artist.href }}">{{ artist.name }} </a>
       {% endfor %}
+      <a href="{{ url_for('playlists.delete_track', playlist_id=playlist.id, track_id=track.id, ) }}">
+                          X
+      </a>
     </td>
   </tr>
 </table>
