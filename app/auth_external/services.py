@@ -146,64 +146,69 @@ class Spotify():
         return True
 
     # adds a spotify track to a playlist
-    def add_track_to_playlist(self, playlist, source, track):
-        # tries to get a link to track art
-        try:
-            art = track['track']['album']['images'][2]['url']
-        except:
-            art = ''
+    def add_track_to_playlist(self, playlist, source, track, blacklist=[]):
+        # retrieves the track from the database (if it exists)
+        db_track = Track.query.filter_by(title=track['track']['name'], source_id=source.id).first()
 
-        # tries to get external link
-        try:
-            href = track['track']['external_urls']['spotify']
-        except:
-            href = 'https://open.spotify.com'
-
-        # if this is a new track that is not in db, create and add it
-        if not Track.query.filter_by(title=track['track']['name'], source_id=source.id).first():
-            t = Track(
-                title=track['track']['name'],
-                service='spotify',
-                service_id=track['track']['id'],
-                source_id=source.id,
-                art=art,
-                href=href)
-
-            # adds artists from track into the database
-            artists = track['track']['artists']
-            for artist in artists:
-                # tries to get the external link to the artist
-                try:
-                    href = artist['external_urls']['spotify']
-                except:
-                    href = 'https://open.spotify.com'
-
-                t.add_artist(
-                    artist['name'],
-                    artist['id'],
-                    href)
-
-            # tries to get the external link to album
+        # checks if the track was previously blacklisted by the user
+        if not db_track in blacklist:
+            # tries to get a link to track art
             try:
-                href = track['track']['album']['external_urls']['spotify']
+                art = track['track']['album']['images'][2]['url']
+            except:
+                art = ''
+
+            # tries to get external link
+            try:
+                href = track['track']['external_urls']['spotify']
             except:
                 href = 'https://open.spotify.com'
 
-            # links the track to its album
-            t.add_album(
-                track['track']['album']['name'],
-                track['track']['album']['id'],
-                href
-            )
+            # if this is a new track that is not in db, create and add it
+            if not db_track:
+                t = Track(
+                    title=track['track']['name'],
+                    service='spotify',
+                    service_id=track['track']['id'],
+                    source_id=source.id,
+                    art=art,
+                    href=href)
 
-            db.session.add(t)
+                # adds artists from track into the database
+                artists = track['track']['artists']
+                for artist in artists:
+                    # tries to get the external link to the artist
+                    try:
+                        href = artist['external_urls']['spotify']
+                    except:
+                        href = 'https://open.spotify.com'
 
-        # adds track to this playlist
-        playlist.add_track(
-            Track.query.filter_by(
-                title=track['track']['name'],
-                service='spotify',
-                source_id=source.id).first())
+                    t.add_artist(
+                        artist['name'],
+                        artist['id'],
+                        href)
+
+                # tries to get the external link to album
+                try:
+                    href = track['track']['album']['external_urls']['spotify']
+                except:
+                    href = 'https://open.spotify.com'
+
+                # links the track to its album
+                t.add_album(
+                    track['track']['album']['name'],
+                    track['track']['album']['id'],
+                    href
+                )
+
+                db.session.add(t)
+
+            # adds track to this playlist
+            playlist.add_track(
+                Track.query.filter_by(
+                    title=track['track']['name'],
+                    service='spotify',
+                    source_id=source.id).first())
 
 # handles the authorization and interfacing with the youtube api
 class Youtube():
@@ -387,49 +392,54 @@ class Youtube():
         return True
 
     # adds a youtube track to a playlist
-    def add_track_to_playlist(self, playlist, source, track):
-        if not Track.query.filter_by(title=track['snippet']['title'], source_id=source.id).first():
-            # tries to get a link to track art
-            try:
-                art = track['snippet']['thumbnails']['default']['url']
-            except:
-                art = ''
+    def add_track_to_playlist(self, playlist, source, track, blacklist=[]):
+        # retrieves the track from the database (if it exists)
+        db_track = Track.query.filter_by(title=track['snippet']['title'], source_id=source.id).first()
 
-            # tries to get external link
-            try:
-                href = 'https://www.youtube.com/watch?v=' + track['snippet']['resourceId']['videoId']
-            except:
-                href = 'https://www.youtube.com'
+        # checks if the track is in the playlist's blacklist
+        if not db_track in blacklist:
+            if not db_track:
+                # tries to get a link to track art
+                try:
+                    art = track['snippet']['thumbnails']['default']['url']
+                except:
+                    art = ''
 
-            # tries to get the channel that uploaded the video
-            try:
-                videoOwnerChannelTitle = track['snippet']['videoOwnerChannelTitle']
-                videoOwnerChannelId = track['snippet']['videoOwnerChannelId']
-            except:
-                videoOwnerChannelTitle = ''
-                videoOwnerChannelId = ''
+                # tries to get external link
+                try:
+                    href = 'https://www.youtube.com/watch?v=' + track['snippet']['resourceId']['videoId']
+                except:
+                    href = 'https://www.youtube.com'
 
-            # if there is a new track that is not in db, add it
-            t = Track(
-                title=track['snippet']['title'],
-                service='youtube',
-                service_id=track['snippet']['resourceId']['videoId'],
-                source_id=source.id,
-                art=art,
-                href=href)
+                # tries to get the channel that uploaded the video
+                try:
+                    videoOwnerChannelTitle = track['snippet']['videoOwnerChannelTitle']
+                    videoOwnerChannelId = track['snippet']['videoOwnerChannelId']
+                except:
+                    videoOwnerChannelTitle = ''
+                    videoOwnerChannelId = ''
 
-            # adds artists from track into the database
-            t.add_artist(
-                videoOwnerChannelTitle,
-                videoOwnerChannelId,
-                'https://www.youtube.com/channel/' + videoOwnerChannelId)
+                # if there is a new track that is not in db, add it
+                t = Track(
+                    title=track['snippet']['title'],
+                    service='youtube',
+                    service_id=track['snippet']['resourceId']['videoId'],
+                    source_id=source.id,
+                    art=art,
+                    href=href)
 
-            db.session.add(t)
+                # adds artists from track into the database
+                t.add_artist(
+                    videoOwnerChannelTitle,
+                    videoOwnerChannelId,
+                    'https://www.youtube.com/channel/' + videoOwnerChannelId)
 
-        # adds track to this playlist
-        playlist.add_track(
-            Track.query.filter_by(
-                title=track['snippet']['title'],
-                service='youtube').first())
+                db.session.add(t)
+
+            # adds track to this playlist
+            playlist.add_track(
+                Track.query.filter_by(
+                    title=track['snippet']['title'],
+                    service='youtube').first())
 
 # https://youtube.com/playlist?list=PLVCtLXKko6G0zRGLJwnEg5OAri2HMVtcc

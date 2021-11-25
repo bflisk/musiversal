@@ -162,6 +162,14 @@ def view_playlist(playlist_id):
     return render_template('playlists/view_playlist.html',
         form=form, playlist=playlist, sources=sources, tracks=tracks, len=len)
 
+@bp.route('/blacklist/<playlist_id>')
+@login_required
+def view_blacklist(playlist_id):
+    playlist = Playlist.query.filter_by(id=playlist_id)
+    blacklist = playlist.blacklist.all()
+
+    return render_template('playlists/view_blacklist.html', playlist=playlist, blacklist=blacklist)
+
 @bp.route('/refresh_playlist/<playlist_id>')
 @login_required
 def refresh_playlist(playlist_id):
@@ -179,6 +187,9 @@ def refresh_playlist(playlist_id):
     # loops through the db's list of sources and keeps it up-to-date
     # tries to retrieve the playlist from a service, if it doesn't exist remove it from db
     for source in playlist.sources.all():
+        # gets the playlist's blacklisted tracks
+        blacklist = playlist.blacklist.all()
+
         if source.service == 'spotify':
             # returns whether the user is following the given playlist
             response = sp.api.playlist_is_following(
@@ -189,8 +200,7 @@ def refresh_playlist(playlist_id):
             if response[0] == False:
                 # removes the tracks that were on the source from the db
                 to_delete_tracks = playlist.tracks.filter_by(
-                    source_id=source.id
-                )
+                    source_id=source.id)
 
                 for track in to_delete_tracks:
                     playlist.remove_track(track)
@@ -228,7 +238,7 @@ def refresh_playlist(playlist_id):
                 for track in sp_tracks:
                     if not track['track']['name'] in db_tracks_titles:
                         # if the track is not in the list of local playlist tracks
-                        sp.add_track_to_playlist(playlist, source, track)
+                        sp.add_track_to_playlist(playlist, source, track, blacklist)
 
                 """
                 loops through tracklist of the musiversal playlist and
@@ -273,7 +283,7 @@ def refresh_playlist(playlist_id):
                 for track in yt_tracks:
                     if not track['snippet']['title'] in db_tracks_titles:
                         # if the track is not in the list of local playlist tracks
-                        yt.add_track_to_playlist(playlist, source, track)
+                        yt.add_track_to_playlist(playlist, source, track, blacklist)
 
                 """
                 loops through tracklist of the musiversal playlist and
@@ -318,9 +328,10 @@ def delete_track(playlist_id, track_id):
     track = Track.query.filter_by(
         id=track_id).first()
 
-    # removes the track ifthe playlist exists
+    # removes the track if the playlist exists
     if playlist:
         playlist.remove_track(track)
+        playlist.blacklist.append(track)
         db.session.commit()
     else:
         flash('This playlist does not exist')

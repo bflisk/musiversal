@@ -22,6 +22,14 @@ playlist_track = db.Table('playlist_track',
     db.Column('track_pos', db.Integer)
 )
 
+# each entry in this table is a track that is blacklisted on a specific table
+# being blacklisted means the specific track cannot be added from any source until /
+# it is un-blacklisted
+blacklist = db.Table('blacklist',
+    db.Column('playlist_id', db.Integer, db.ForeignKey('playlist.id')),
+    db.Column('track_id', db.Integer, db.ForeignKey('track.id'))
+)
+
 # association table connecting playlists and sources
 playlist_source = db.Table('playlist_source',
     db.Column('playlist_id', db.Integer, db.ForeignKey('playlist.id')),
@@ -144,6 +152,11 @@ class Playlist(db.Model):
         secondary=playlist_track,
         back_populates='playlists',
         lazy='dynamic')
+    blacklist = db.relationship(
+        'Track',
+        secondary=blacklist,
+        back_populates='blacklisted_on',
+        lazy='dynamic')
 
     def __repr__(self):
         return '<Playlist {}, ID {}>'.format(
@@ -218,6 +231,11 @@ class Track(db.Model):
         secondary=playlist_track,
         back_populates='tracks',
         lazy='dynamic') # list of playlists the track is on
+    blacklisted_on = db.relationship(
+        'Playlist',
+        secondary=blacklist,
+        back_populates='blacklist',
+        lazy='dynamic')
 
     def __repr__(self):
         return '<Track {}, Service {}>'.format(
