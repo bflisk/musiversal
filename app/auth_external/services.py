@@ -146,9 +146,12 @@ class Spotify():
         return True
 
     # adds a spotify track to a playlist
-    def add_track_to_playlist(self, playlist, source, track, blacklist=[]):
+    def add_track_to_playlist(self, playlist, source, track):
         # retrieves the track from the database (if it exists)
-        db_track = Track.query.filter_by(title=track['track']['name'], source_id=source.id).first()
+        db_track = Track.query.filter_by(title=track['track']['name']).first()
+
+        # gets the playlist's blacklisted tracks
+        blacklist = playlist.blacklist.all()
 
         # checks if the track was previously blacklisted by the user
         if not db_track in blacklist:
@@ -170,7 +173,6 @@ class Spotify():
                     title=track['track']['name'],
                     service='spotify',
                     service_id=track['track']['id'],
-                    source_id=source.id,
                     art=art,
                     href=href)
 
@@ -203,12 +205,13 @@ class Spotify():
 
                 db.session.add(t)
 
-            # adds track to this playlist
-            playlist.add_track(
-                Track.query.filter_by(
-                    title=track['track']['name'],
-                    service='spotify',
-                    source_id=source.id).first())
+            track = Track.query.filter_by(
+                title=track['track']['name'],
+                service='spotify').first()
+
+            # adds track to this playlist and adds source to track
+            playlist.add_track(track)
+            track.sources.append(source)
 
 # handles the authorization and interfacing with the youtube api
 class Youtube():
@@ -392,11 +395,14 @@ class Youtube():
         return True
 
     # adds a youtube track to a playlist
-    def add_track_to_playlist(self, playlist, source, track, blacklist=[]):
+    def add_track_to_playlist(self, playlist, source, track):
         # retrieves the track from the database (if it exists)
-        db_track = Track.query.filter_by(title=track['snippet']['title'], source_id=source.id).first()
+        db_track = Track.query.filter_by(title=track['snippet']['title']).first()
 
-        # checks if the track is in the playlist's blacklist
+        # gets the playlist's blacklisted tracks
+        blacklist = playlist.blacklist.all()
+
+        # checks if the track was previously blacklisted by the user
         if not db_track in blacklist:
             if not db_track:
                 # tries to get a link to track art
@@ -424,7 +430,6 @@ class Youtube():
                     title=track['snippet']['title'],
                     service='youtube',
                     service_id=track['snippet']['resourceId']['videoId'],
-                    source_id=source.id,
                     art=art,
                     href=href)
 
@@ -436,10 +441,17 @@ class Youtube():
 
                 db.session.add(t)
 
-            # adds track to this playlist
-            playlist.add_track(
-                Track.query.filter_by(
-                    title=track['snippet']['title'],
-                    service='youtube').first())
+            track = Track.query.filter_by(
+                title=track['snippet']['title'],
+                service='youtube').first()
+
+            # adds track to this playlist and adds source to track
+            playlist.add_track(track)
+            track.sources.append(source)
 
 # https://youtube.com/playlist?list=PLVCtLXKko6G0zRGLJwnEg5OAri2HMVtcc
+
+"""
+<iframe src="{{ "https://www.youtube-nocookie.com/embed/{0}?showinfo=0&rel=0&iv_load_policy=3&fs=0&controls=0&disablekb=1".format(track.service_id) }}" width="64" height="64" frameborder="0">
+</iframe>
+"""

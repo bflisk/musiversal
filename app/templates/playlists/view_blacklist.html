@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+{% import 'bootstrap/wtf.html' as wtf %}
+
+{% block title %}
+  Playlist: {{ playlist.title }}
+{% endblock %}
+
+{% block app_content %}
+  <h1>Playlist "{{ playlist.title }}":</h1>
+  <br>
+  <p>{{ playlist.description }}</p>
+  <hr>
+  <h2>Blacklist ({{ len(blacklist) }}): </h2>
+  <br>
+  {% for track in blacklist %}
+    {% include 'playlists/_track.html' %}
+  {% endfor %}
+{% endblock %}

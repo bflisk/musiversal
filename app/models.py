@@ -12,8 +12,6 @@ from sqlalchemy import delete
 # u.services.filter_by(name='spotify').first().id
 # outputs the spotify service entry for a specific user
 
-#--- Association Tables ---#
-
 # association table connecting playlists and tracks
 # is used to prevent duplication of tracks if one track is used in multiple playlists
 playlist_track = db.Table('playlist_track',
@@ -27,7 +25,8 @@ playlist_track = db.Table('playlist_track',
 # it is un-blacklisted
 blacklist = db.Table('blacklist',
     db.Column('playlist_id', db.Integer, db.ForeignKey('playlist.id')),
-    db.Column('track_id', db.Integer, db.ForeignKey('track.id'))
+    db.Column('track_id', db.Integer, db.ForeignKey('track.id')),
+    db.Column('reason', db.String(120))
 )
 
 # association table connecting playlists and sources
@@ -50,19 +49,11 @@ track_artist = db.Table('track_artist',
     db.Column('artist_id', db.Integer, db.ForeignKey('artist.id'))
 )
 
-#--- Mixins ---#
-
-# returns artwork and links for a given object
-"""class InfoMixin(object):
-    @classmethod
-    def art(cls):
-        return #ARTWORK
-
-    @classmethod
-    def link(cls):
-        return #LINK"""
-
-#--- Non-association Tables ---#
+# association table connecting tracks and sources
+track_source = db.Table('track_source',
+    db.Column('track_id', db.Integer, db.ForeignKey('track.id')),
+    db.Column('source_id', db.Integer, db.ForeignKey('source.id'))
+)
 
 # stores information on the user logged into universal, NOT a service attached to universal
 class User(UserMixin, db.Model):
@@ -199,38 +190,47 @@ class Source(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     service = db.Column(db.String(32))
     service_id = db.Column(db.String(64))
+    title = db.Column(db.String(128))
+    art = db.Column(db.String(1024)) # source artwork
+    href = db.Column(db.String(1024)) # source external link
     playlists = db.relationship(
         'Playlist',
         secondary=playlist_source,
         back_populates='sources',
         lazy='dynamic')
-    tracks = db.relationship('Track', backref='source', lazy='dynamic')
+    tracks = db.relationship(
+        'Track',
+        secondary=track_source,
+        back_populates='sources',
+        lazy='dynamic')
 
     def __repr__(self):
-        return '<Source for playlist {}, Service {}, Options {}>'.format(
-            self.playlist_id, self.service, self.options)
+        return '<Source {}, Service {}>'.format(self.service_id, self.service)
 
 # stores information on a track hosted on a specific service
 class Track(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    # pos = db.Column(db.Integer) # the position of the track in the playlist
     service = db.Column(db.String(32)) # name of the service the track is on
     service_id = db.Column(db.String(64)) # track id on the corresponding service
-    source_id = db.Column(db.String(64), db.ForeignKey('source.id')) # id of the external playlist this track is on
     title = db.Column(db.String(128))
     art = db.Column(db.String(1024)) # track artwork
     href = db.Column(db.String(1024)) # track external link
     album_id = db.Column(db.Integer, db.ForeignKey('album.id')) # album the track is on
+    sources = db.relationship(
+        'Source',
+        secondary=track_source,
+        back_populates='tracks',
+        lazy='dynamic')
     artists = db.relationship(
         'Artist',
         secondary=track_artist,
         back_populates='tracks',
-        lazy='dynamic') # list of artists that created the track
+        lazy='dynamic')
     playlists = db.relationship(
         'Playlist',
         secondary=playlist_track,
         back_populates='tracks',
-        lazy='dynamic') # list of playlists the track is on
+        lazy='dynamic')
     blacklisted_on = db.relationship(
         'Playlist',
         secondary=blacklist,

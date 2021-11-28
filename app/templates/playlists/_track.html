@@ -2,10 +2,9 @@
   <tr>
     <td width="64px">
       {% if track.service == 'spotify' %}
-      <img src="{{ track.art }}">
+      <img src="{{ track.art }}" height="64" width="64">
       {% elif track.service == 'youtube' %}
-      <iframe src="{{ "https://www.youtube-nocookie.com/embed/{0}?showinfo=0&rel=0&iv_load_policy=3&fs=0&controls=0&disablekb=1".format(track.service_id) }}" width="64" height="64" frameborder="0">
-      </iframe>
+      <img src="{{ track.art }}" height="64" width="64">
       {% endif %}
     </td>
 
@@ -22,8 +21,11 @@
       {% for artist in track.artists %}
         <a href="{{ artist.href }}">{{ artist.name }} </a>
       {% endfor %}
-      <a href="{{ url_for('playlists.delete_track', playlist_id=playlist.id, track_id=track.id, ) }}">
+      <a href="{{ url_for('playlists.blacklist_track', playlist_id=playlist.id, track_id=track.id, ) }}">
         X
+      </a>
+      <a href="{{ url_for('playlists.whitelist_track', playlist_id=playlist.id, track_id=track.id, ) }}">
+        +
       </a>
     </td>
   </tr>

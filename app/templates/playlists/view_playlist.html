@@ -18,9 +18,7 @@
   <hr>
   <br>
   {% for source in sources %}
-    <ul>
-      {{ source.service }}: {{ source.service_id }}
-    </ul>
+    {% include 'playlists/_source.html' %}
   {% endfor %}
   <a href="{{ url_for('playlists.refresh_playlist', playlist_id=playlist.id) }}">
     Refresh Playlist
@@ -28,6 +26,10 @@
   <br>
   <a href="{{ url_for('playlists.delete_playlist', playlist_id=playlist.id) }}">
     Delete Playlist
+  </a>
+  <br>
+  <a href="{{ url_for('playlists.view_blacklist', playlist_id=playlist.id) }}">
+    View Blacklist
   </a>
   <hr>
   <h2>Track List ({{ len(tracks) }}): </h2>
