@@ -37,3 +37,8 @@
 
   {% block app_content %}{% endblock %}
 {% endblock %}
+
+{% block scripts %}
+  {{ super() }}
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+{% endblock scripts %}

@@ -6,6 +6,7 @@ from sqlalchemy import MetaData
 from flask_migrate import Migrate
 from flask_login import LoginManager
 from flask_bootstrap import Bootstrap
+from flask_marshmallow import Marshmallow
 
 # defines a naming convention to replace unnamed SQLite columns
 naming_convention = {
@@ -20,10 +21,13 @@ naming_convention = {
 metadata = MetaData(naming_convention=naming_convention)
 db = SQLAlchemy(metadata=metadata)
 migrate = Migrate()
+bootstrap = Bootstrap()
+ma = Marshmallow()
 login = LoginManager()
+
 login.login_view = 'auth_internal.login' # Indicates the function that handles logins
 login.login_message = 'Please log in to access this page'
-bootstrap = Bootstrap()
+
 
 def create_app(config_class=Config):
     #--- App Configuration ---#
@@ -35,6 +39,7 @@ def create_app(config_class=Config):
     migrate.init_app(app, db, render_as_batch=True)
     login.init_app(app)
     bootstrap.init_app(app)
+    ma.init_app(app)
 
     #--- Blueprints ---#
     from app.main import bp as main_bp

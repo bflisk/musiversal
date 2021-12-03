@@ -3,10 +3,8 @@
 
 {% block app_content %}
   <h1>Hello {{ current_user.username }}!</h1>
-  {% for service in services %}
-    <ul>{{ current_user.username }} is logged into {{ service.name }}: {{ service.credentials }}</ul>
-  {% endfor %}
-  <br>
+  <hr>
+  <h3>Your Playlists: </h3>
   {% for playlist in playlists %}
     <ul>
       <a href="{{ url_for('playlists.view_playlist', playlist_id=playlist.id) }}">

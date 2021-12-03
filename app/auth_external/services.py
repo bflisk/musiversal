@@ -70,6 +70,9 @@ class Spotify():
     # creates api object and passes it into itself
     def create_api(self):
         # tries to get token data, return none if unable to
+        token_info = self.get_token()
+        self.api = spotipy.Spotify(auth=token_info['access_token'])
+        session['sp_username'] = self.api.current_user()
         try:
             token_info = self.get_token()
             self.api = spotipy.Spotify(auth=token_info['access_token'])
@@ -148,7 +151,7 @@ class Spotify():
     # adds a spotify track to a playlist
     def add_track_to_playlist(self, playlist, source, track):
         # retrieves the track from the database (if it exists)
-        db_track = Track.query.filter_by(title=track['track']['name']).first()
+        db_track = Track.query.filter_by(service_id=track['track']['id']).first()
 
         # gets the playlist's blacklisted tracks
         blacklist = playlist.blacklist.all()
@@ -205,9 +208,7 @@ class Spotify():
 
                 db.session.add(t)
 
-            track = Track.query.filter_by(
-                title=track['track']['name'],
-                service='spotify').first()
+            track = Track.query.filter_by(service_id=track['track']['id']).first()
 
             # adds track to this playlist and adds source to track
             playlist.add_track(track)
@@ -397,7 +398,7 @@ class Youtube():
     # adds a youtube track to a playlist
     def add_track_to_playlist(self, playlist, source, track):
         # retrieves the track from the database (if it exists)
-        db_track = Track.query.filter_by(title=track['snippet']['title']).first()
+        db_track = Track.query.filter_by(service_id=track['snippet']['resourceId']['videoId']).first()
 
         # gets the playlist's blacklisted tracks
         blacklist = playlist.blacklist.all()

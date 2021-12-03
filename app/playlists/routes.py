@@ -1,12 +1,11 @@
-from flask import render_template, flash, redirect, url_for, request, session
+from flask import render_template, flash, redirect, url_for, request, session, jsonify
 from flask_login import current_user, login_required
 from sqlalchemy import func, delete
 from app import db
 from app.playlists import bp
 from app.auth_external.services import Spotify, Youtube
 from app.playlists.forms import CreatePlaylistForm, EditPlaylistForm
-from app.models import User, Service, Playlist, Track, Artist, Source
-from app.models import blacklist as Blacklist
+from app.models import *
 from urllib.parse import urlparse
 
 # Allows the user to create a new playlist, propagating it to supported services
@@ -166,11 +165,105 @@ def view_playlist(playlist_id):
 
     # retrieves the playlist's tracks from the db
     tracks = playlist.tracks.all()
+    playlist_length = playlist.tracks.count()
 
     return render_template('playlists/view_playlist.html',
-        form=form, playlist=playlist, sources=sources, tracks=tracks, len=len)
+        form=form, playlist=playlist, playlist_length=playlist_length, sources=sources, tracks=tracks)
 
-@bp.route('/blacklist/<playlist_id>')
+# returns 15 tracks from a certain section of a playlist
+@bp.route('/get_tracks/<playlist_id>/<offset>', methods=['POST'])
+@login_required
+def get_tracks(playlist_id, offset):
+    # retrieves the playlist from the database
+    playlist = Playlist.query.filter_by(
+        id=playlist_id,
+        user_id=current_user.id).first()
+
+    # retrieves the playlist's tracks from the db
+    tracks = playlist.tracks.limit(15).offset(15 * offset).all()
+
+    # converts tracks to serializable objects
+    track_schema = TrackSchema()
+    tracks_serialized = [track_schema.dump(t) for t in tracks]
+
+    return jsonify(tracks_serialized)
+
+# TODOTODOTODOTODOTODOTODOTODOTODOTODOTODOTODO
+@bp.route('/update_playlist/<playlist_id>', methods=['POST'])
+@login_required
+def update_playlist(playlist_id):
+    # updates the playlist with new options
+    sources = [form.sources.data] # a list of NEW sources the user wants to add
+    playlist = Playlist.query.filter_by(
+        user_id=current_user.id,
+        id=playlist_id) # the current playlist being edited
+
+    # updates the playlist title
+    if form.title.data:
+        playlist.update({'title': form.title.data})
+
+    # updates the playlist description
+    if form.description.data:
+        playlist.update({'description': form.description.data})
+
+    # if the user is trying to add more sources to the playlist
+    if sources:
+        for source in sources:
+            if 'spotify' in source or len(source) == 22:
+                # verifies the source and returns the service id
+                service_id = sp.get_service_id(source)
+                if not service_id:
+                    flash(f'Must input playlist ID or playlist link: ({source})')
+                    break
+
+                # checks that the service id refers to a valid spotify playlist
+                if not sp.verify_service_id(service_id):
+                    flash(f'You are not following this spotify playlist or the id is incorrect: ({source})')
+                    break
+
+                # adds the source to the database
+                if not Source.query.filter_by(service_id=service_id).first():
+                    title = sp.api.playlist(playlist_id=service_id)['name']
+                    art = sp.api.playlist_cover_image(playlist_id=service_id)[0]['url']
+                    href = 'https://open.spotify.com/playlist/' + str(service_id)
+
+                    source = Source(
+                        service='spotify',
+                        service_id=service_id,
+                        title=title,
+                        art=art,
+                        href=href)
+                    db.session.add(source)
+
+                playlist.first().add_source(
+                    Source.query.filter_by(
+                        service_id=service_id).first())
+            elif 'youtube' in source or len(source) == 34:
+                # verifies the source
+                service_id = yt.get_service_id(source)
+                if not service_id:
+                    flash(f'Must input playlist ID or playlist link: ({source})')
+                    break
+
+                # checks that the service id refers to a valid youtube playlist
+                if not yt.verify_service_id(service_id):
+                    flash(f'You are not following this spotify playlist or the id is incorrect: ({source})')
+                    break
+
+                # adds the source to the database
+                source = Source(
+                    service='youtube',
+                    service_id=service_id)
+                db.session.add(source)
+                playlist.first().add_source(source)
+            else:
+                flash(f'Not a valid sp or yt playlist link: ({source})')
+
+    db.session.commit()
+
+    return redirect(url_for('playlists.refresh_playlist', playlist_id=playlist_id))
+
+@bp.route('/view_blacklist/<playlist_id>')
 @login_required
 def view_blacklist(playlist_id):
     playlist = Playlist.query.filter_by(id=playlist_id).first()
@@ -204,8 +297,9 @@ def refresh_playlist(playlist_id):
             # checks if the source still exists
             if response[0] == False:
                 # removes the tracks that were on the source from the db
-                to_delete_tracks = playlist.tracks.filter_by(
-                    source_id=source.id)
+                playlist_tracks = playlist.tracks.all()
+                source_tracks = source.tracks.all()
+                to_delete_tracks = set(playlist_tracks) & set(source_tracks)
 
                 for track in to_delete_tracks:
                     playlist.remove_track(track)
@@ -220,8 +314,7 @@ def refresh_playlist(playlist_id):
                 if not sp.verify_service_id(source.service_id):
                     # queries for tracks attached to the source to be removed
                     # and removes the tracks
-                    source_tracks = Track.query.filter_by(
-                        source_id=source.id)
+                    source_tracks = source.tracks.all()
                     for track in source_tracks:
                         playlist.remove_track(track)
 
@@ -238,8 +331,8 @@ def refresh_playlist(playlist_id):
                 db_tracks = set(playlist_tracks) & set(source_tracks)
 
                 # parses the tracklists for just the titles
-                sp_tracks_titles = [track['track']['name'] for track in sp_tracks]
-                db_tracks_titles = [track.title for track in db_tracks]
+                sp_tracks_ids = [track['track']['id'] for track in sp_tracks]
+                db_tracks_ids = [track.service_id for track in db_tracks]
 
                 """
                 loops through tracklist of the spotify playlist and
@@ -247,7 +340,7 @@ def refresh_playlist(playlist_id):
                 to the database if it does not yet exist
                 """
                 for track in sp_tracks:
-                    if not track['track']['name'] in db_tracks_titles:
+                    if not track['track']['id'] in db_tracks_ids:
                         # if the track is not in the list of local playlist tracks
                         sp.add_track_to_playlist(playlist, source, track)
 
@@ -258,7 +351,7 @@ def refresh_playlist(playlist_id):
                 does not exist in the spotify tracklist.
                 """
                 for track in db_tracks:
-                    if not track.title in sp_tracks_titles:
+                    if not track.service_id in sp_tracks_ids:
                         # if the track is not in the spotify tracklist
                         playlist.remove_track(track)
 
@@ -286,8 +379,8 @@ def refresh_playlist(playlist_id):
                 db_tracks = set(playlist_tracks) & set(source_tracks)
 
                 # parses the tracklists for just the names
-                yt_tracks_titles = [track['snippet']['title'] for track in yt_tracks]
-                db_tracks_titles = [track.title for track in db_tracks]
+                yt_tracks_ids = [track['snippet']['resourceId']['videoId'] for track in yt_tracks]
+                db_tracks_ids = [track.service_id for track in db_tracks]
 
                 """
                 loops through tracklist of the youtube playlist and
@@ -295,7 +388,7 @@ def refresh_playlist(playlist_id):
                 to the database if it does not yet exist
                 """
                 for track in yt_tracks:
-                    if not track['snippet']['title'] in db_tracks_titles:
+                    if not track['snippet']['resourceId']['videoId'] in db_tracks_ids:
                         # if the track is not in the list of local playlist tracks
                         yt.add_track_to_playlist(playlist, source, track)
 
@@ -306,7 +399,7 @@ def refresh_playlist(playlist_id):
                 does not exist in the youtube tracklist.
                 """
                 for track in db_tracks:
-                    if not track.title in yt_tracks_titles:
+                    if not track.service_id in yt_tracks_ids:
                         # if the track is not in the spotify tracklist
                         playlist.remove_track(track)
 
@@ -368,13 +461,13 @@ def blacklist_track(playlist_id, track_id):
         id=track_id).first()
 
     # removes the track if the playlist exists
-    if playlist:
+    if playlist and not track in playlist.blacklist:
         playlist.remove_track(track)
         playlist.blacklist.append(track)
         # db.session.execute(f"UPDATE blacklist SET reason = {"User removed"} WHERE track_id = {track.id}")
         db.session.commit()
     else:
-        flash('This playlist does not exist')
+        flash('This playlist does not exist or the track is already blacklisted')
 
     return redirect(url_for('playlists.view_playlist', playlist_id=playlist_id))
 
@@ -389,10 +482,9 @@ def whitelist_track(playlist_id, track_id):
 
     # removes the track if the playlist exists
     if playlist:
-        playlist.add_track(track)
         playlist.blacklist.remove(track)
         db.session.commit()
     else:
         flash('This playlist does not exist')
 
-    return redirect(url_for('playlists.view_playlist', playlist_id=playlist_id))
+    return redirect(url_for('playlists.refresh_playlist', playlist_id=playlist_id))

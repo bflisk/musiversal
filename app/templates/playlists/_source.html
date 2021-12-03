@@ -1,6 +1,6 @@
-<table>
+<table id="{{ source.id }}" class='source'>
   <tr>
-    <td width="64px">
+    <td class="art source-art" width="64px">
       {% if source.service == 'spotify' %}
       <img src="{{ source.art }}" height="64" width="64">
       {% elif source.service == 'youtube' %}
@@ -11,15 +11,13 @@
     <td>
       <span class="source_popup">
         <p>
-          {{ source.service }} :
+          {{ source.service }} : {{ source.service_id }}
         </p>
         <a href="{{ source.href }}">
           {{ source.title }}
         </a>
       </span>
-      <a href="{{ url_for('playlists.delete_source', playlist_id=playlist.id, source_id=source.id, ) }}">
-        X
-      </a>
+      <a href="{{ url_for('playlists.delete_source', playlist_id=playlist.id, source_id=source.id, ) }}">X</a>
     </td>
   </tr>
 </table>

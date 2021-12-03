@@ -1,0 +1,103 @@
+<div class="track" id = "track-1">
+  <table>
+    <tr>
+      <td class="art track-art" width="64px">
+        <img src="art_href" height="64" width="64">
+      </td>
+
+      <td>
+        <span class="track-info">
+          <a href="track_href">
+            track_title
+          </a> :
+          <a href="album_href">
+            album_title
+          </a>
+        </span>
+        <br>
+        <span class="artist-info">
+        {% for artist in track.artists %}
+          <a href="artist_href">artist_name</a>
+        {% endfor %}
+        </span>
+      </td>
+    </tr>
+  </table>
+  <hr>
+</div>
+
+<script>
+  const playlist_length = {{ playlist_length }}
+  const playlist_id = {{ playlist_id }}
+
+  getTracks();
+
+  function getTracks() {
+    for(let offset = 0; offset < playlist_length; offset++) {
+      // call get_tracks function with incrementing offset, when 0 is returned exit
+      $.ajax({
+        url: "/get_tracks/" + playlist_id + "/" + offset,
+        type: "POST",
+        dataType: "json",
+      })
+      .done(function(data) {
+
+        if(data.tracks === 'None') {
+          return 0;
+        } else {
+          console.log(data.tracks);
+          //for(let i = 0; i < data.tracks.length; i++) {
+            // add an element for each track
+        };
+
+      });
+
+    };
+
+  };
+
+
+
+
+
+  // returns a track to play
+  function shuffle(track_ids) {
+    return 1
+  };
+
+  // plays a track
+  function playTrack(track_id) {
+    return 1
+  };
+</script>
+
+<!-- Original _track.html -->
+<table id="{{ track.id }}" class='track'>
+  <tr>
+    <td class="art track-art" width="64px">
+      {% if track.service == 'spotify' %}
+      <img src="{{ track.art }}" height="64" width="64">
+      {% elif track.service == 'youtube' %}
+      <img src="{{ track.art }}" height="64" width="64">
+      {% endif %}
+    </td>
+
+    <td>
+      <span class="track_popup">
+        <a href="{{ track.href }}">
+          {{ track.title }}
+        </a> :
+        <a href="{{ track.album }}">
+          {{ track.album.title }}
+        </a>
+      </span>
+      <br>
+      {% for artist in track.artists %}
+        <a href="{{ artist.href }}">{{ artist.name }} </a>
+      {% endfor %}
+      <a href="{{ url_for('playlists.blacklist_track', playlist_id=playlist.id, track_id=track.id, ) }}">x</a>
+      <a href="{{ url_for('playlists.whitelist_track', playlist_id=playlist.id, track_id=track.id, ) }}">+</a>
+    </td>
+  </tr>
+</table>
+<hr>

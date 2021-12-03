@@ -3,14 +3,23 @@
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import UserMixin
 from datetime import datetime
-from app import db, login
+from app import db, ma, login
 from flask import current_app
 from config import Config
 from sqlalchemy import delete
+from sqlalchemy.inspection import inspect
 
 # EXAMPLE QUERY FOR FUTURE REFERENCE
 # u.services.filter_by(name='spotify').first().id
 # outputs the spotify service entry for a specific user
+
+class Serializer(object):
+    def serialize(self):
+        return {c: getattr(self, c) for c in inspect(self).attrs.keys()}
+
+    @staticmethod
+    def serialize_list(l):
+        return [m.serialize() for m in l]
 
 # association table connecting playlists and tracks
 # is used to prevent duplication of tracks if one track is used in multiple playlists
@@ -56,7 +65,7 @@ track_source = db.Table('track_source',
 )
 
 # stores information on the user logged into universal, NOT a service attached to universal
-class User(UserMixin, db.Model):
+class User(UserMixin, db.Model, Serializer):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(64), index=True, unique=True)
     email = db.Column(db.String(120), index=True, unique=True)
@@ -67,6 +76,10 @@ class User(UserMixin, db.Model):
 
     def __repr__(self):
         return '<User {}>'.format(self.username)
+
+    def serialize(self):
+        d = Serializer.serialize(self)
+        return d
 
     # sets password hash for user given a password
     def set_password(self, password):
@@ -115,7 +128,7 @@ class User(UserMixin, db.Model):
 
 # each row is a separate service for each separate user
 # i.e. user1 has 4 service rows attached and user2 has 4 service rows attached
-class Service(db.Model):
+class Service(db.Model, Serializer):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     username = db.Column(db.String(120), default='NULL') # username ON THE SERVICE
@@ -126,8 +139,12 @@ class Service(db.Model):
         return '<Service {}, User {}, Username {}>'.format(
             self.name, User.query.filter_by(id=self.user_id), self.username)
 
+    def serialize(self):
+        d = Serializer.serialize(self)
+        return d
+
 # stores playlist information for universal playlists, NOT service-specific playlists
-class Playlist(db.Model):
+class Playlist(db.Model, Serializer):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     title = db.Column(db.String(30))
@@ -152,6 +169,10 @@ class Playlist(db.Model):
     def __repr__(self):
         return '<Playlist {}, ID {}>'.format(
             self.title, self.id)
+
+    def serialize(self):
+        d = Serializer.serialize(self)
+        return d
 
     # adds a track to the playlist
     def add_track(self, track):
@@ -186,7 +207,7 @@ class Playlist(db.Model):
 
 # stores dynamic sources of a playlist and their options
 # a sources is defined as playlist hosted on an external service
-class Source(db.Model):
+class Source(db.Model, Serializer):
     id = db.Column(db.Integer, primary_key=True)
     service = db.Column(db.String(32))
     service_id = db.Column(db.String(64))
@@ -207,8 +228,12 @@ class Source(db.Model):
     def __repr__(self):
         return '<Source {}, Service {}>'.format(self.service_id, self.service)
 
+    def serialize(self):
+        d = Serializer.serialize(self)
+        return d
+
 # stores information on a track hosted on a specific service
-class Track(db.Model):
+class Track(db.Model, Serializer):
     id = db.Column(db.Integer, primary_key=True)
     service = db.Column(db.String(32)) # name of the service the track is on
     service_id = db.Column(db.String(64)) # track id on the corresponding service
@@ -240,6 +265,10 @@ class Track(db.Model):
     def __repr__(self):
         return '<Track {}, Service {}>'.format(
             self.title, self.service)
+
+    def serialize(self):
+        d = Serializer.serialize(self)
+        return d
 
     # links a track to its artists
     def add_artist(self, name, service_id, href=None):
@@ -278,7 +307,7 @@ class Track(db.Model):
         db.session.commit()
 
 # stores infromation about an album
-class Album(db.Model):
+class Album(db.Model, Serializer):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(128))
     service = db.Column(db.String(32)) # name of the service the track is on
@@ -293,6 +322,10 @@ class Album(db.Model):
 
     def __repr__(self):
         return '<Album {}>'.format(self.title)
+
+    def serialize(self):
+        d = Serializer.serialize(self)
+        return d
 
     # returns artist profile picture
     def art(self):
@@ -309,7 +342,7 @@ class Album(db.Model):
             return #YOUTUBE LINK
 
 # stores information about an artist
-class Artist(db.Model):
+class Artist(db.Model, Serializer):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(128))
     service_id = db.Column(db.String(256))
@@ -329,6 +362,10 @@ class Artist(db.Model):
     def __repr__(self):
         return '<Artist {}>'.format(self.name)
 
+    def serialize(self):
+        d = Serializer.serialize(self)
+        return d
+
     # returns album artwork
     def art(self):
         if self.service == 'spotify':
@@ -342,6 +379,43 @@ class Artist(db.Model):
             return #SPOTIFY LINK
         elif self.service == 'youtube':
             return #YOUTUBE LINK
+
+
+#- Meta tables from Marchmallow -#
+class UserSchema(ma.SQLAlchemyAutoSchema):
+    class Meta:
+        model = User
+        include_fk = True
+
+class ServiceSchema(ma.SQLAlchemyAutoSchema):
+    class Meta:
+        model = Service
+        include_fk = True
+
+class PlaylistSchema(ma.SQLAlchemyAutoSchema):
+    class Meta:
+        model = Playlist
+        include_fk = True
+
+class SourceSchema(ma.SQLAlchemyAutoSchema):
+    class Meta:
+        model = Source
+        include_fk = True
+
+class TrackSchema(ma.SQLAlchemyAutoSchema):
+    class Meta:
+        model = Track
+        include_fk = True
+
+class AlbumSchema(ma.SQLAlchemyAutoSchema):
+    class Meta:
+        model = Album
+        include_fk = True
+
+class ArtistSchema(ma.SQLAlchemyAutoSchema):
+    class Meta:
+        model = Artist
+        include_fk = True
 
 @login.user_loader
 def load_user(id):

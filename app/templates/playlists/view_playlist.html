@@ -32,9 +32,82 @@
     View Blacklist
   </a>
   <hr>
-  <h2>Track List ({{ len(tracks) }}): </h2>
+  <h2>Track List ({{ playlist_length }}): </h2>
   <br>
-  {% for track in tracks %}
+  <div class="tracks">
     {% include 'playlists/_track.html' %}
-  {% endfor %}
-{% endblock %}
+  </div>
+{% endblock app_content %}
+
+{% block scripts %}
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+<script>
+  const playlistLength = {{ playlist_length }}
+  const playlistId = {{ playlist.id }}
+
+  // loads the correct amount of track beds, which will contain individual tracks
+  $(document).ready(function loadTracks() {
+    for(let i = 0; i < playlistLength; i++) {
+      // gets the last track div
+      lastTrackDiv = $(".track").last();
+
+      // updates info for the track div
+      lastTrackDiv.id = "track-" + i;
+      console.log(lastTrackDiv);
+
+      // duplicated the track div
+      lastTrackDiv.clone().appendTo(".tracks");
+    };
+  });
+
+  console.log($.ajax({
+    url: "/get_tracks/" + playlistId + "/" + 0,
+    type: "POST"
+  })
+  .done(function(data) {
+    if(data.tracks === 'None') {
+      return 0;
+    } else {
+      console.log(data.tracks);
+      //for(let i = 0; i < data.tracks.length; i++) {
+        // add an element for each track
+    };
+  }));
+
+  for(let offset = 0; offset < playlistLength; offset++) {
+    // call get_tracks function with incrementing offset, when 0 is returned exit
+    $.ajax({
+      url: "/get_tracks/" + playlistId + "/" + offset,
+      type: "POST"
+    })
+    .done(function(data) {
+      if(data.tracks === 'None') {
+        return 0;
+      } else {
+        console.log(data.tracks);
+        //for(let i = 0; i < data.tracks.length; i++) {
+          // add an element for each track
+      };
+    });
+  };
+
+  function getTracks() {
+    for(let offset = 0; offset < playlistLength; offset++) {
+      // call get_tracks function with incrementing offset, when 0 is returned exit
+      $.ajax({
+        url: "/get_tracks/" + playlistId + "/" + offset,
+        type: "POST"
+      })
+      .done(function(data) {
+        if(data.tracks === 'None') {
+          return 0;
+        } else {
+          console.log(data.tracks);
+          //for(let i = 0; i < data.tracks.length; i++) {
+            // add an element for each track
+        };
+      });
+    };
+  };
+</script>
+{% endblock scripts %}

@@ -1,33 +1,25 @@
-<table>
-  <tr>
-    <td width="64px">
-      {% if track.service == 'spotify' %}
-      <img src="{{ track.art }}" height="64" width="64">
-      {% elif track.service == 'youtube' %}
-      <img src="{{ track.art }}" height="64" width="64">
-      {% endif %}
-    </td>
+<div class="track" id = "track-0">
+  <table>
+    <tr>
+      <td class="art track-art" width="64px">
+        <img src="art_href" height="64" width="64">
+      </td>
 
-    <td>
-      <span class="track_popup">
-        <a href="{{ track.href }}">
-          {{ track.title }}
-        </a> :
-        <a href="{{ track.album }}">
-          {{ track.album.title }}
-        </a>
-      </span>
-      <br>
-      {% for artist in track.artists %}
-        <a href="{{ artist.href }}">{{ artist.name }} </a>
-      {% endfor %}
-      <a href="{{ url_for('playlists.blacklist_track', playlist_id=playlist.id, track_id=track.id, ) }}">
-        X
-      </a>
-      <a href="{{ url_for('playlists.whitelist_track', playlist_id=playlist.id, track_id=track.id, ) }}">
-        +
-      </a>
-    </td>
-  </tr>
-</table>
-<hr>
+      <td>
+        <span class="track-info">
+          <a href="track_href">
+            track_title
+          </a> :
+          <a href="album_href">
+            album_title
+          </a>
+        </span>
+        <br>
+        <span class="artist-info">
+          <a href="artist_href">artist_name</a>
+        </span>
+      </td>
+    </tr>
+  </table>
+  <hr>
+</div>
