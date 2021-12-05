@@ -405,7 +405,6 @@ class SourceSchema(ma.SQLAlchemyAutoSchema):
 class TrackSchema(ma.SQLAlchemyAutoSchema):
     class Meta:
         model = Track
-        include_fk = True
 
 class AlbumSchema(ma.SQLAlchemyAutoSchema):
     class Meta:

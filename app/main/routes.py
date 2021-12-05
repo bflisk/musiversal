@@ -19,7 +19,7 @@ def before_request():
 @bp.route('/index', methods=['GET', 'POST'])
 @login_required
 def index():
-    #db.session.commit()
+    db.session.commit()
     """
     {% for service in services %}
         <ul>{{ current_user.username }} is logged into {{ service.name }}: {{ service.credentials }}</ul>

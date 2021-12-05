@@ -60,54 +60,34 @@
     };
   });
 
-  console.log($.ajax({
-    url: "/get_tracks/" + playlistId + "/" + 0,
-    type: "POST"
-  })
-  .done(function(data) {
-    if(data.tracks === 'None') {
-      return 0;
-    } else {
-      console.log(data.tracks);
-      //for(let i = 0; i < data.tracks.length; i++) {
-        // add an element for each track
-    };
-  }));
-
-  for(let offset = 0; offset < playlistLength; offset++) {
-    // call get_tracks function with incrementing offset, when 0 is returned exit
+  // gets a group of 15 tracks from a set position
+  function getTracks(offset) {
     $.ajax({
       url: "/get_tracks/" + playlistId + "/" + offset,
       type: "POST"
     })
     .done(function(data) {
-      if(data.tracks === 'None') {
-        return 0;
-      } else {
-        console.log(data.tracks);
-        //for(let i = 0; i < data.tracks.length; i++) {
+      if(data != undefined) {
+        for(let i = 0; i < data.length; i++) {
+          // $("#track-" + i)[0].children[0].children[0].firstChild.children
           // add an element for each track
+          console.log(data[i]);
+        };
       };
     });
   };
 
-  function getTracks() {
-    for(let offset = 0; offset < playlistLength; offset++) {
-      // call get_tracks function with incrementing offset, when 0 is returned exit
-      $.ajax({
-        url: "/get_tracks/" + playlistId + "/" + offset,
-        type: "POST"
-      })
-      .done(function(data) {
-        if(data.tracks === 'None') {
-          return 0;
-        } else {
-          console.log(data.tracks);
-          //for(let i = 0; i < data.tracks.length; i++) {
-            // add an element for each track
-        };
-      });
-    };
+  // returns whether an element is in the viewport or not
+  function isScrolledIntoView(elem) {
+    let docViewTop = $(window).scrollTop();
+    let docViewBottom = docViewTop + $(window).height();
+
+    let elemTop = $(elem).top;
+    let elemBottom = elemTop + $(elem).height();
+
+    let isVisible = ((elemBottom <= docViewBottom) && (elemTop >= docViewTop));
+
+    return isVisible;
   };
 </script>
 {% endblock scripts %}

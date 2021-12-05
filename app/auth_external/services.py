@@ -2,7 +2,7 @@ from config import Config
 from time import time
 from flask import session, url_for, redirect, request
 from flask_login import current_user
-from sqlalchemy import delete
+from sqlalchemy import delete, text
 from app.models import Service, Source, Track
 from app import db
 from urllib.parse import urlparse
@@ -209,6 +209,28 @@ class Spotify():
                 db.session.add(t)
 
             track = Track.query.filter_by(service_id=track['track']['id']).first()
+            last_track_pos = db.engine.execute(f"SELECT MAX(track_pos) FROM playlist_track WHERE playlist_id={playlist.id};").first()
+
+            # sets the track positions of new tracks in the playlist
+            if last_track_pos != (None,):
+                # sets track pos based on the last track in the playlist
+                with db.engine.begin() as conn:
+                    sql = text(
+                        f"""UPDATE playlist_track
+                            SET track_pos=(
+                                SELECT MAX(track_pos) FROM playlist_track where playlist_id={playlist.id}) + 1
+                            WHERE track_id={track.id}
+                            AND playlist_id={playlist.id};""")
+                    conn.execute(sql)
+            else:
+                # sets track pos for the first track to 0
+                with db.engine.begin() as conn:
+                    sql = text(
+                        f"""UPDATE playlist_track
+                            SET track_pos=0
+                            WHERE track_id={track.id}
+                            AND playlist_id={playlist.id};""")
+                    conn.execute(sql)
 
             # adds track to this playlist and adds source to track
             playlist.add_track(track)

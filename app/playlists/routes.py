@@ -164,29 +164,43 @@ def view_playlist(playlist_id):
         return redirect(url_for('playlists.refresh_playlist', playlist_id=playlist_id))
 
     # retrieves the playlist's tracks from the db
-    tracks = playlist.tracks.all()
+    # tracks = playlist.tracks.all()
     playlist_length = playlist.tracks.count()
 
     return render_template('playlists/view_playlist.html',
-        form=form, playlist=playlist, playlist_length=playlist_length, sources=sources, tracks=tracks)
+        form=form, playlist=playlist, playlist_length=playlist_length, sources=sources)
 
 # returns 15 tracks from a certain section of a playlist
 @bp.route('/get_tracks/<playlist_id>/<offset>', methods=['POST'])
 @login_required
 def get_tracks(playlist_id, offset):
+    track_schema = TrackSchema()
+    artist_schema = ArtistSchema()
+    album_schema = AlbumSchema()
+
+    # Queries for 15 tracks from the playlist, ordered by their track positions
+    tracks = Track.query.join(playlist_track).filter(
+        playlist_track.c.playlist_id == playlist_id).order_by(
+            playlist_track.c.track_pos).limit(15).offset(offset).all()
+
     # retrieves the playlist from the database
     playlist = Playlist.query.filter_by(
         id=playlist_id,
         user_id=current_user.id).first()
 
-    # retrieves the playlist's tracks from the db
-    tracks = playlist.tracks.limit(15).offset(15 * offset).all()
+    # retrieves each track's corresponding artists and albums and serializes them
+    artists = [[artist_schema.dump(a) for a in t.artists.all()] for t in tracks]
+    albums = [album_schema.dump(Album.query.filter_by(id=t.album_id).first()) for t in tracks]
 
     # converts tracks to serializable objects
-    track_schema = TrackSchema()
-    tracks_serialized = [track_schema.dump(t) for t in tracks]
+    data = [track_schema.dump(t) for t in tracks]
 
-    return jsonify(tracks_serialized)
+    # attaches relevant artist and album data to each track
+    for i in range(len(data)):
+        data[i].update({'artists': artists[i]})
+        data[i].update({'album': albums[i]})
+
+    return jsonify(data)
 
 # TODOTODOTODOTODOTODOTODOTODOTODOTODOTODOTODO
 @bp.route('/update_playlist/<playlist_id>', methods=['POST'])
