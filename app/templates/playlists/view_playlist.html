@@ -1,15 +1,24 @@
 {% extends 'base.html' %}
 {% import 'bootstrap/wtf.html' as wtf %}
 
+{% block style %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/playlists.css') }}">
+{% endblock style %}
+
 {% block title %}
   Playlist: {{ playlist.title }}
-{% endblock %}
+{% endblock title %}
 
 {% block app_content %}
   <h1>Playlist "{{ playlist.title }}":</h1>
   <br>
   <p>{{ playlist.description }}</p>
   <hr>
+  <div style="position: fixed; top: 0; right: 0; border: 1px solid black; background-color: white; width: 20em">
+    <p>Scroll position: <span id="scrollpos"></span></p>
+    <p>Rows checked: <span id="count"></span></p>
+    <p>First row: <span id="first"></span></p>
+  </div>
   <div class="row">
     <div class="col-md-4">
       {{ wtf.quick_form(form) }}
@@ -20,74 +29,30 @@
   {% for source in sources %}
     {% include 'playlists/_source.html' %}
   {% endfor %}
-  <a href="{{ url_for('playlists.refresh_playlist', playlist_id=playlist.id) }}">
-    Refresh Playlist
-  </a>
+  <btn id="refresh-playlist">Refresh Playlist</btn>
   <br>
-  <a href="{{ url_for('playlists.delete_playlist', playlist_id=playlist.id) }}">
+  <a id="delete-playlist" href="{{ url_for('playlists.delete_playlist', playlist_id=playlist.id) }}">
     Delete Playlist
   </a>
   <br>
-  <a href="{{ url_for('playlists.view_blacklist', playlist_id=playlist.id) }}">
+  <a id="view-blacklist" href="{{ url_for('playlists.view_blacklist', playlist_id=playlist.id) }}">
     View Blacklist
   </a>
   <hr>
   <h2>Track List ({{ playlist_length }}): </h2>
   <br>
-  <div class="tracks">
-    {% include 'playlists/_track.html' %}
+  <div class="tracks" id="tracks">
+    {% for i in range(playlist_length) %}
+      {% include 'playlists/_track.html' %}
+    {% endfor %}
   </div>
 {% endblock app_content %}
 
 {% block scripts %}
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
-<script>
+<script type="text/javascript">
   const playlistLength = {{ playlist_length }}
   const playlistId = {{ playlist.id }}
-
-  // loads the correct amount of track beds, which will contain individual tracks
-  $(document).ready(function loadTracks() {
-    for(let i = 0; i < playlistLength; i++) {
-      // gets the last track div
-      lastTrackDiv = $(".track").last();
-
-      // updates info for the track div
-      lastTrackDiv.id = "track-" + i;
-      console.log(lastTrackDiv);
-
-      // duplicated the track div
-      lastTrackDiv.clone().appendTo(".tracks");
-    };
-  });
-
-  // gets a group of 15 tracks from a set position
-  function getTracks(offset) {
-    $.ajax({
-      url: "/get_tracks/" + playlistId + "/" + offset,
-      type: "POST"
-    })
-    .done(function(data) {
-      if(data != undefined) {
-        for(let i = 0; i < data.length; i++) {
-          // $("#track-" + i)[0].children[0].children[0].firstChild.children
-          // add an element for each track
-          console.log(data[i]);
-        };
-      };
-    });
-  };
-
-  // returns whether an element is in the viewport or not
-  function isScrolledIntoView(elem) {
-    let docViewTop = $(window).scrollTop();
-    let docViewBottom = docViewTop + $(window).height();
-
-    let elemTop = $(elem).top;
-    let elemBottom = elemTop + $(elem).height();
-
-    let isVisible = ((elemBottom <= docViewBottom) && (elemTop >= docViewTop));
-
-    return isVisible;
-  };
 </script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/playlists.js') }}"></script>
 {% endblock scripts %}

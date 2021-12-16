@@ -27,6 +27,10 @@
 {% endblock navbar %}
 
 {% block content %}
+  <div class="container-fluid" id="sidebar">
+    
+  </div>
+
   {% with messages = get_flashed_messages() %}
   {% if messages %}
     {% for message in messages %}
@@ -35,7 +39,8 @@
   {% endif %}
   {% endwith %}
 
-  {% block app_content %}{% endblock %}
+  {% block app_content %}
+  {% endblock %}
 {% endblock %}
 
 {% block scripts %}

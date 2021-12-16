@@ -2,8 +2,8 @@ from config import Config
 from time import time
 from flask import session, url_for, redirect, request
 from flask_login import current_user
-from sqlalchemy import delete, text
-from app.models import Service, Source, Track
+from sqlalchemy import delete, update, text
+from app.models import Service, Source, Track, playlist_track
 from app import db
 from urllib.parse import urlparse
 
@@ -158,20 +158,21 @@ class Spotify():
 
         # checks if the track was previously blacklisted by the user
         if not db_track in blacklist:
-            # tries to get a link to track art
-            try:
-                art = track['track']['album']['images'][2]['url']
-            except:
-                art = ''
-
-            # tries to get external link
-            try:
-                href = track['track']['external_urls']['spotify']
-            except:
-                href = 'https://open.spotify.com'
-
             # if this is a new track that is not in db, create and add it
             if not db_track:
+                # tries to get a link to track art
+                try:
+                    art = track['track']['album']['images'][2]['url']
+                except:
+                    art = ''
+
+                # tries to get external link
+                try:
+                    href = track['track']['external_urls']['spotify']
+                except:
+                    href = 'https://open.spotify.com'
+
+
                 t = Track(
                     title=track['track']['name'],
                     service='spotify',
@@ -208,33 +209,24 @@ class Spotify():
 
                 db.session.add(t)
 
+            # queries the database for the track
             track = Track.query.filter_by(service_id=track['track']['id']).first()
-            last_track_pos = db.engine.execute(f"SELECT MAX(track_pos) FROM playlist_track WHERE playlist_id={playlist.id};").first()
 
-            # sets the track positions of new tracks in the playlist
-            if last_track_pos != (None,):
-                # sets track pos based on the last track in the playlist
-                with db.engine.begin() as conn:
-                    sql = text(
-                        f"""UPDATE playlist_track
-                            SET track_pos=(
-                                SELECT MAX(track_pos) FROM playlist_track where playlist_id={playlist.id}) + 1
-                            WHERE track_id={track.id}
-                            AND playlist_id={playlist.id};""")
-                    conn.execute(sql)
+            # used to prevent a bug where the track_pos was getting updated
+            # when a track that is already in the db was added to the playlist
+            if not track in playlist.tracks.all():
+                was_not_in_playlist = True
             else:
-                # sets track pos for the first track to 0
-                with db.engine.begin() as conn:
-                    sql = text(
-                        f"""UPDATE playlist_track
-                            SET track_pos=0
-                            WHERE track_id={track.id}
-                            AND playlist_id={playlist.id};""")
-                    conn.execute(sql)
+                was_not_in_playlist = False
 
             # adds track to this playlist and adds source to track
             playlist.add_track(track)
             track.sources.append(source)
+            db.session.commit()
+
+            # if the track has now been on the playlist before, update its track_pos
+            if was_not_in_playlist:
+                playlist.set_track_pos(track)
 
 # handles the authorization and interfacing with the youtube api
 class Youtube():
@@ -327,6 +319,19 @@ class Youtube():
 
         return response
 
+    # returns a youtube playlist from a service id
+    def get_playlist(self, service_id):
+        response = None
+
+        if self.verify_service_id(service_id):
+            request = self.api.playlists().list(
+                part='snippet',
+                id=service_id
+            )
+            response = request.execute()
+
+        return response
+
     # creates a new playlist on youtube
     def create_playlist(self, title, description, visibility, default_language):
         request = self.api.playlists().insert(
@@ -408,12 +413,15 @@ class Youtube():
     # returns false if the source is not valid
     def verify_service_id(self, service_id):
         # checks if the source exists
+        # test the playlist link
         try:
-            # test the playlist link
-            pass
+            request = self.api.playlistItems().list(
+                part='snippet',
+                playlistId=service_id
+            )
+            response = request.execute()
         except:
-            # playlist link is not valid
-            return None
+            return False
 
         return True
 
@@ -464,13 +472,24 @@ class Youtube():
 
                 db.session.add(t)
 
-            track = Track.query.filter_by(
-                title=track['snippet']['title'],
-                service='youtube').first()
+            # queries the database for the track
+            track = Track.query.filter_by(service_id=track['snippet']['resourceId']['videoId']).first()
+
+            # used to prevent a bug where the track_pos was getting updated /
+            # when a track that is already in the db was added to the playlist
+            if not track in playlist.tracks.all():
+                was_not_in_playlist = True
+            else:
+                was_not_in_playlist = False
 
             # adds track to this playlist and adds source to track
             playlist.add_track(track)
             track.sources.append(source)
+            db.session.commit()
+
+            # if the track has now been on the playlist before, update its track_pos
+            if was_not_in_playlist:
+                playlist.set_track_pos(track)
 
 # https://youtube.com/playlist?list=PLVCtLXKko6G0zRGLJwnEg5OAri2HMVtcc
 

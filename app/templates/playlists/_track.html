@@ -1,25 +1,24 @@
-<div class="track" id="track-0">
-  <table>
-    <tr>
-      <td class="art track-art" width="64px">
-        <img src="art_href" height="64" width="64">
-      </td>
+<div class="container-fluid track-bed unloaded" id="{{ 'track' + str(i) }}" background-color=".ccc">
+  <div class="row">
+    <div class="col-sm-1 track-images">
+      <img class="art track-art" height="64" width="64">
+    </div>
 
-      <td>
-        <span class="track-info">
-          <a href="track_href">
-            track_title
-          </a> :
-          <a href="album_href">
-            album_title
-          </a>
-        </span>
-        <br>
-        <span class="artist-info">
-          <a href="artist_href">artist_name</a>
-        </span>
-      </td>
-    </tr>
-  </table>
+    <div class="col-sm-11 container-fluid track-body">
+      <div class="row">
+        <div class="col-sm-4">
+          <a class="track-info"></a>
+          <div class="artist-list"></div>
+        </div>
+        <div class="col-sm-4">
+          <a class="album-info"></a>
+        </div>
+        <div class="col-sm-4">
+          <p class="track-service"></p>
+        </div>
+      </div>
+      <br>
+    </div>
+  </div>
   <hr>
 </div>

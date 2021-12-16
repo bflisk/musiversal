@@ -6,7 +6,7 @@ from datetime import datetime
 from app import db, ma, login
 from flask import current_app
 from config import Config
-from sqlalchemy import delete
+from sqlalchemy import delete, update, text
 from sqlalchemy.inspection import inspect
 
 # EXAMPLE QUERY FOR FUTURE REFERENCE
@@ -180,6 +180,7 @@ class Playlist(db.Model, Serializer):
             self.tracks.append(track)
 
     # removes a track from the playlist
+    # updates track_pos to be continuous
     def remove_track(self, track):
         if self.contains_track(track):
             self.tracks.remove(track)
@@ -204,6 +205,37 @@ class Playlist(db.Model, Serializer):
     def contains_source(self, source):
         return self.sources.filter_by(
             service_id=source.service_id).first()
+
+    # updates all track positions in playlist to make them continuous
+    def refresh_track_positions(self):
+        track_ids = db.session.execute(text(f'SELECT track_id FROM playlist_track WHERE playlist_id={self.id}')).all()
+        for i in range(len(track_ids)):
+            sql = update(playlist_track).where(
+                playlist_track.c.track_id==track_ids[i][0]).where(
+                    playlist_track.c.playlist_id==self.id).values(track_pos=i)
+            db.session.execute(sql)
+
+    def set_track_pos(self, track):
+        # gets the position of the last track on the playlist
+        last_track_pos = db.session.execute(
+            f"""SELECT MAX(track_pos)
+                FROM playlist_track
+                WHERE playlist_id={self.id};""").first()
+
+        # sets the track positions of new tracks in the playlist
+        if last_track_pos != (None,):
+            # if the playlist isn't empty, add track onto the end
+            sql = update(playlist_track).where(
+                playlist_track.c.track_id == track.id).where(
+                    playlist_track.c.playlist_id == self.id).values(
+                        track_pos=int(last_track_pos[0]) + 1)
+        else:
+            # if the playlist is empty, initialize track position to 0
+            sql = update(playlist_track).where(
+                playlist_track.c.track_id == track.id).where(
+                    playlist_track.c.playlist_id == self.id).values(track_pos=0)
+
+        db.session.execute(sql)
 
 # stores dynamic sources of a playlist and their options
 # a sources is defined as playlist hosted on an external service
@@ -299,7 +331,8 @@ class Track(db.Model, Serializer):
             album = Album(
                 title=title,
                 service_id=service_id,
-                service=self.service)
+                service=self.service,
+                href=href)
             db.session.add(album)
 
         self.album_id = Album.query.filter_by(title=title, service_id=service_id).first().id
