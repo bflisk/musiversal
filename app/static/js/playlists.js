@@ -6,6 +6,7 @@
 
 // stops the addTracks async function from recalling before tracks are loaded
 var addTracksFlag = false;
+addTracks(0, 15);
 
 // gets a group of tracks from a set position
 async function addTracks(offset, amount) {
@@ -115,7 +116,7 @@ $(function inViewport() {
 
 // refreshes the playlist in the background
 $('#refresh-playlist').click(async function() {
-  $('#refresh-playlist').html("<img src='{{ url_for('static', filename='loading.gif') }}'>");
+  $('#refresh-playlist').html("<img src='{{ url_for('static', filename='images/loading.gif') }}'>");
 
   $.ajax({
     url: "/refresh_playlist/" + playlistId,

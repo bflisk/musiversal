@@ -432,7 +432,7 @@ def refresh_playlist(playlist_id):
                 db.session.execute(d)
             else:
                 # updates playlist art and title
-                yt_playlist = yt.get_playlist(service_id)
+                yt_playlist = yt.get_playlist(source.service_id)
                 title = yt_playlist['items'][0]['snippet']['title']
                 art = yt_playlist['items'][0]['snippet']['thumbnails']['default']['url']
 
